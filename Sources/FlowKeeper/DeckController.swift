@@ -73,7 +73,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         hosting.wantsLayer = true
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
         hosting.layer?.masksToBounds = true
-        hosting.autoresizingMask = [.width, .height]
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
         panel.contentView = hosting
 
         self.panel = panel
@@ -233,58 +233,24 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     private func transitionPreview(to id: UUID?) async {
-        let previous = previewID
-        if drawerOpen, previous != nil, previous != id {
+        guard !Task.isCancelled else { return }
+        previewID = id
+        if id == nil {
             withAnimation(Self.drawerAnimation) {
                 drawerOpen = false
             }
-            if id == nil {
-                applyLayout(animated: true, refreshRoot: false)
-            }
-            await sleepDrawer()
-            guard !Task.isCancelled else { return }
-        }
-
-        previewID = id
-
-        if id == nil {
-            if drawerOpen {
-                withAnimation(Self.drawerAnimation) {
-                    drawerOpen = false
-                }
-                applyLayout(animated: true, refreshRoot: false)
-            }
             return
         }
-
-        var snap = Transaction()
-        snap.animation = nil
-        withTransaction(snap) {
-            drawerOpen = false
-        }
-        await Task.yield()
-        guard !Task.isCancelled else { return }
-
-        let widthChanged = previous == nil
         withAnimation(Self.drawerAnimation) {
             drawerOpen = true
-        }
-        if widthChanged {
-            applyLayout(animated: true, refreshRoot: false)
         }
     }
 
     private func openDrawer(widthChanged: Bool) async {
+        guard !Task.isCancelled else { return }
         withAnimation(Self.drawerAnimation) {
             drawerOpen = true
         }
-        if widthChanged {
-            applyLayout(animated: true, refreshRoot: false)
-        }
-    }
-
-    private func sleepDrawer() async {
-        try? await Task.sleep(nanoseconds: UInt64(DeckMetrics.drawerDuration * 1_000_000_000))
     }
 
     func tabID(atYFromTop yFromTop: CGFloat) -> UUID? {
@@ -344,7 +310,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         if refreshRoot {
             syncRoot()
         }
-        hosting.frame = NSRect(origin: .zero, size: frame.size)
+        pinHosting(to: frame.size)
         if animated {
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = DeckMetrics.drawerDuration
@@ -352,13 +318,29 @@ final class DeckController: NSObject, NSWindowDelegate {
                 panel.animator().setFrame(frame, display: true)
             }, completionHandler: { [weak self] in
                 Task { @MainActor in
-                    self?.syncPreviewToMouse()
+                    guard let self else { return }
+                    self.pinHosting(to: frame.size)
+                    self.syncPreviewToMouse()
                 }
             })
         } else {
             panel.setFrame(frame, display: true)
+            pinHosting(to: frame.size)
             syncPreviewToMouse()
         }
+    }
+
+    /// Keep SwiftUI content glued to the panel's trailing/top edges so a grow-left
+    /// (or grow-down) animation reveals the drawer instead of clipping tabs.
+    private func pinHosting(to size: NSSize) {
+        let bounds = panel.contentView?.bounds ?? hosting.superview?.bounds ?? .zero
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
+        hosting.frame = NSRect(
+            x: bounds.maxX - size.width,
+            y: bounds.maxY - size.height,
+            width: size.width,
+            height: size.height
+        )
     }
 
     func targetFrame(on screen: NSScreen) -> NSRect {
@@ -380,7 +362,7 @@ final class DeckController: NSObject, NSWindowDelegate {
             )
         case .peek:
             let stack = tabStackHeight(count: max(items.count, 1))
-            let extra = (previewID != nil && drawerOpen) ? DeckMetrics.previewWidth : 0
+            let extra = DeckMetrics.previewWidth
             let height = stack + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
             let width = DeckMetrics.tabWidth + extra + pad
             return NSRect(

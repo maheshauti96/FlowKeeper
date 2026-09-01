@@ -56,10 +56,7 @@ struct DeckView: View {
         if case .expanded = deck.mode {
             return deck.expandedSize.width
         }
-        if deck.previewID != nil {
-            return DeckMetrics.previewWidth
-        }
-        return 0
+        return DeckMetrics.previewWidth
     }
 
     @ViewBuilder
@@ -91,7 +88,6 @@ struct DeckView: View {
         HStack(alignment: .top, spacing: 0) {
             drawerPaper
                 .frame(width: drawerSlotWidth)
-                .clipped()
 
             VStack(alignment: .trailing, spacing: DeckMetrics.tabStride - DeckMetrics.tabHeight) {
                 ForEach(items) { item in
