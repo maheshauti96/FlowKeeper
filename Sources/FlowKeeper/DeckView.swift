@@ -258,6 +258,10 @@ struct NoteSheet: View {
         .animation(DeckController.drawerAnimation, value: showInterior)
         .animation(DeckController.drawerAnimation, value: phase)
         .accessibilityLabel(item.displayTitle)
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() }
+            else { NSCursor.pop() }
+        }
         .overlay(alignment: .leading) {
             if phase == .expanded { resizeEdge(widthSign: -1, heightSign: 0, width: 8, height: nil) }
         }

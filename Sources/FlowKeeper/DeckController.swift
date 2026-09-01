@@ -160,28 +160,12 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func enterPeek(fromTap: Bool = false) {
         guard mode == .dormant else { return }
-        mode = .peek
-        applyLayout(animated: true)
-        syncRoot()
-        startFan()
-    }
-
-    private func startFan() {
         fanTask?.cancel()
-        let count = store.visibleDeckItems.count
-        fanCount = 0
-        fanTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            for i in 0..<count {
-                guard !Task.isCancelled else { return }
-                guard self.mode == .peek || self.isExpanded else { return }
-                withAnimation(Self.drawerAnimation) {
-                    self.fanCount = i + 1
-                }
-                let ns = UInt64(DeckMetrics.fanStagger * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: ns)
-            }
-        }
+        // Reveal every tab at once. Resetting fanCount to 0 then staggering it
+        // made the first hover expand, shrink, then expand again.
+        mode = .peek
+        fanCount = store.visibleDeckItems.count
+        applyLayout(animated: true, refreshRoot: false)
     }
 
     func openFromClick(_ id: UUID) {
@@ -314,7 +298,6 @@ final class DeckController: NSObject, NSWindowDelegate {
                 Task { @MainActor in
                     guard let self else { return }
                     self.pinHosting(to: frame.size)
-                    self.syncPreviewToMouse()
                 }
             })
         } else {
