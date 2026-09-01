@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DeckView: View {
@@ -292,10 +293,16 @@ struct ExpandedNote: View {
                         AppDelegate.shared.openBoard(editing: item)
                     } label: {
                         Image(systemName: "pencil")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(swatch.ink.opacity(0.5))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(swatch.ink)
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .onHover { hovering in
+                        if hovering { NSCursor.pointingHand.push() }
+                        else { NSCursor.pop() }
+                    }
                     .help("Edit on board")
                     .accessibilityLabel("Edit on board")
 
