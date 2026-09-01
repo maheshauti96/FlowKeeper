@@ -19,6 +19,8 @@ enum DeckMetrics {
     static let previewWidth: CGFloat = 248
     static let noteWidth: CGFloat = 304
     static let noteMinHeight: CGFloat = 228
+    static let noteResizeMinWidth: CGFloat = 240
+    static let noteResizeMinHeight: CGFloat = 180
     static let plusSize: CGFloat = 28
     static let plusGap: CGFloat = 12
     static let shadowPad: CGFloat = 22

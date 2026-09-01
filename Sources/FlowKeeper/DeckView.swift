@@ -56,7 +56,7 @@ struct DeckView: View {
         HStack(alignment: .top, spacing: 0) {
             if case .expanded(let id) = deck.mode, let item = store.items.first(where: { $0.id == id }) {
                 ExpandedNote(store: store, item: item, deck: deck)
-                    .frame(width: DeckMetrics.noteWidth, height: DeckMetrics.noteMinHeight)
+                    .frame(width: deck.expandedSize.width, height: deck.expandedSize.height)
                     .padding(.top, CGFloat(items.firstIndex(where: { $0.id == id }) ?? 0) * DeckMetrics.tabStride)
             } else if let previewID = deck.previewID,
                       let item = store.items.first(where: { $0.id == previewID }),
@@ -323,8 +323,10 @@ struct ExpandedNote: View {
                 NoteBodyView(
                     text: store.bodyBinding(item.id),
                     font: NoteFont.nsBody,
-                    color: swatch.nsInk.withAlphaComponent(0.9)
+                    color: swatch.nsInk.withAlphaComponent(0.9),
+                    showsScroller: true
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
                 HStack(spacing: 8) {
                     ActorAssignMenu(store: store, item: item)
@@ -343,12 +345,100 @@ struct ExpandedNote: View {
             .padding(.leading, 10)
             .padding(.trailing, 14)
             .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(swatch.fill)
                 .shadow(color: .black.opacity(0.22), radius: 16, x: -2, y: 4)
         )
+        .overlay(alignment: .leading) {
+            Color.clear
+                .frame(width: 8)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering { NSCursor.resizeLeftRight.push() }
+                    else { NSCursor.pop() }
+                }
+                .gesture(resizeGesture(widthSign: -1, heightSign: 0))
+        }
+        .overlay(alignment: .bottom) {
+            Color.clear
+                .frame(height: 8)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering { NSCursor.resizeUpDown.push() }
+                    else { NSCursor.pop() }
+                }
+                .gesture(resizeGesture(widthSign: 0, heightSign: 1))
+        }
+        .overlay(alignment: .bottomLeading) {
+            Color.clear
+                .frame(width: 16, height: 16)
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering { NSCursor.crosshair.push() }
+                    else { NSCursor.pop() }
+                }
+                .gesture(resizeGesture(widthSign: -1, heightSign: 1))
+        }
+        .overlay(alignment: .bottomTrailing) {
+            PaperResizeGrip(ink: swatch.ink)
+                .gesture(resizeGesture(widthSign: 1, heightSign: 1))
+                .padding(.trailing, 6)
+                .padding(.bottom, 6)
+        }
         .onExitCommand { deck.collapse() }
+    }
+
+    private func resizeGesture(widthSign: CGFloat, heightSign: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                deck.beginExpandedResize()
+                let origin = deck.resizeOrigin ?? deck.expandedSize
+                deck.setExpandedSize(CGSize(
+                    width: origin.width + value.translation.width * widthSign,
+                    height: origin.height + value.translation.height * heightSign
+                ))
+            }
+            .onEnded { _ in
+                deck.endExpandedResize()
+            }
+    }
+}
+
+private struct PaperResizeGrip: View {
+    var ink: Color
+
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            path.move(to: CGPoint(x: 3, y: size.height - 3))
+            path.addLine(to: CGPoint(x: size.width - 3, y: size.height - 3))
+            path.addLine(to: CGPoint(x: size.width - 3, y: 3))
+            context.stroke(
+                path,
+                with: .color(ink.opacity(0.38)),
+                style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round)
+            )
+            var inner = Path()
+            inner.move(to: CGPoint(x: 8, y: size.height - 3))
+            inner.addLine(to: CGPoint(x: size.width - 3, y: size.height - 3))
+            inner.addLine(to: CGPoint(x: size.width - 3, y: 8))
+            context.stroke(
+                inner,
+                with: .color(ink.opacity(0.22)),
+                style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
+            )
+        }
+        .frame(width: 16, height: 16)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering { NSCursor.crosshair.push() }
+            else { NSCursor.pop() }
+        }
+        .help("Resize")
+        .accessibilityLabel("Resize note")
     }
 }

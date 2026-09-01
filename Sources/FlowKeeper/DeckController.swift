@@ -16,6 +16,12 @@ final class DeckController: NSObject, NSWindowDelegate {
     var mode: DeckMode = .dormant
     var hoverInside = false
     var previewID: UUID?
+    var expandedSize = CGSize(width: DeckMetrics.noteWidth, height: DeckMetrics.noteMinHeight)
+    var isResizing = false
+    var resizeOrigin: CGSize?
+
+    private static let expandedWidthKey = "FlowKeeper.expandedNoteWidth"
+    private static let expandedHeightKey = "FlowKeeper.expandedNoteHeight"
 
     var onOpenBoard: (() -> Void)?
     var onOpenLibrary: ((LibraryScope) -> Void)?
@@ -37,6 +43,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         self.store = store
         self.displayID = displayID
         super.init()
+        expandedSize = Self.loadExpandedSize()
         let panel = DeckPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -283,13 +290,14 @@ final class DeckController: NSObject, NSWindowDelegate {
         case .expanded(let id):
             let stack = tabStackHeight(count: max(items.count, 1))
             let index = items.firstIndex(where: { $0.id == id }) ?? 0
+            let noteSize = clampExpandedSize(expandedSize, visible: vf)
             let noteTopOffset = CGFloat(index) * DeckMetrics.tabStride
-            let noteBottomNeeded = noteTopOffset + DeckMetrics.noteMinHeight
+            let noteBottomNeeded = noteTopOffset + noteSize.height
             let contentHeight = max(stack + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
-            let width = DeckMetrics.noteWidth + DeckMetrics.tabWidth + pad
+            let width = noteSize.width + DeckMetrics.tabWidth + pad
             let height = contentHeight + pad + DeckMetrics.topGutter
             return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - DeckMetrics.noteWidth,
+                x: vf.maxX - DeckMetrics.tabWidth - noteSize.width,
                 y: top - contentHeight,
                 width: width,
                 height: height
@@ -342,8 +350,55 @@ final class DeckController: NSObject, NSWindowDelegate {
         }
     }
 
+    func setExpandedSize(_ size: CGSize) {
+        isResizing = true
+        let vf = assignedScreen()?.visibleFrame
+        let clamped = clampExpandedSize(size, visible: vf)
+        expandedSize = clamped
+        applyLayout(animated: false, refreshRoot: false)
+    }
+
+    func beginExpandedResize() {
+        if resizeOrigin == nil {
+            resizeOrigin = expandedSize
+        }
+        isResizing = true
+    }
+
+    func endExpandedResize() {
+        persistExpandedSize()
+        resizeOrigin = nil
+        isResizing = false
+        applyLayout(animated: false, refreshRoot: false)
+    }
+
+    func clampExpandedSize(_ size: CGSize, visible vf: NSRect? = nil) -> CGSize {
+        let frame = vf ?? assignedScreen()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let maxW = max(DeckMetrics.noteResizeMinWidth, frame.width - DeckMetrics.tabWidth - DeckMetrics.shadowPad - 8)
+        let maxH = max(DeckMetrics.noteResizeMinHeight, frame.height - DeckMetrics.topGutter - DeckMetrics.shadowPad)
+        return CGSize(
+            width: min(max(size.width.rounded(), DeckMetrics.noteResizeMinWidth), maxW),
+            height: min(max(size.height.rounded(), DeckMetrics.noteResizeMinHeight), maxH)
+        )
+    }
+
+    private static func loadExpandedSize() -> CGSize {
+        let defaults = UserDefaults.standard
+        let width = defaults.object(forKey: expandedWidthKey) as? Double
+        let height = defaults.object(forKey: expandedHeightKey) as? Double
+        return CGSize(
+            width: width ?? DeckMetrics.noteWidth,
+            height: height ?? DeckMetrics.noteMinHeight
+        )
+    }
+
+    private func persistExpandedSize() {
+        UserDefaults.standard.set(Double(expandedSize.width), forKey: Self.expandedWidthKey)
+        UserDefaults.standard.set(Double(expandedSize.height), forKey: Self.expandedHeightKey)
+    }
+
     private func collapseIfClickOutside() {
-        guard case .expanded = mode else { return }
+        guard case .expanded = mode, !isResizing else { return }
         let loc = NSEvent.mouseLocation
         if !panel.frame.contains(loc) {
             mode = hoverInside ? .peek : .dormant
