@@ -13,17 +13,18 @@ enum Palette {
 
 enum DeckMetrics {
     static let pillWidth: CGFloat = 12
-    static let tabWidth: CGFloat = 32
-    static let tabHeight: CGFloat = 98
-    static let tabStride: CGFloat = 82
-    static let previewWidth: CGFloat = 248
-    static let noteWidth: CGFloat = 304
-    static let noteMinHeight: CGFloat = 228
-    static let plusSize: CGFloat = 28
+    static let tabWidth: CGFloat = 24
+    static let tabHeight: CGFloat = 84
+    static let tabStride: CGFloat = 54
+    static let peekNudge: CGFloat = 8
+    static let noteWindowWidth: CGFloat = 340
+    static let noteWindowHeight: CGFloat = 300
+    static let plusSize: CGFloat = 26
     static let plusGap: CGFloat = 12
     static let shadowPad: CGFloat = 22
     static let topGutter: CGFloat = 18
     static let maxVisibleTabs = 8
+    static let fanStagger: Double = 0.045
 }
 
 struct StickySwatch: Identifiable, Hashable {

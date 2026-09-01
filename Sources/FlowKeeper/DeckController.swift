@@ -16,6 +16,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     var mode: DeckMode = .dormant
     var hoverInside = false
     var previewID: UUID?
+    var fanOpen = false
 
     var onOpenBoard: (() -> Void)?
     var onOpenLibrary: ((LibraryScope) -> Void)?
@@ -27,6 +28,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     private var leaveTask: Task<Void, Never>?
     private var outsideMonitor: Any?
     private var localOutsideMonitor: Any?
+    private var noteWindow: NoteWindowController?
 
     var isExpanded: Bool {
         if case .expanded = mode { return true }
@@ -77,10 +79,14 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func relayout() {
         applyLayout(animated: false)
+        if case .expanded(let id) = mode {
+            noteWindow?.present(id: id, near: noteFrame(for: id), overFullscreen: store.showOverFullscreen)
+        }
     }
 
     func close() {
         leaveTask?.cancel()
+        closeNoteWindow()
         if let outsideMonitor {
             NSEvent.removeMonitor(outsideMonitor)
         }
@@ -95,9 +101,11 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func forceDormant() {
         leaveTask?.cancel()
+        closeNoteWindow()
         previewID = nil
         hoverInside = false
         guard mode != .dormant else { return }
+        fanOpen = false
         mode = .dormant
         applyLayout(animated: true)
         syncRoot()
@@ -107,16 +115,23 @@ final class DeckController: NSObject, NSWindowDelegate {
         previewID = nil
         onWillExpand?(displayID)
         store.pinToDeck(id, pin: true)
+        let wasOpen = mode != .dormant
         mode = .expanded(id)
-        applyLayout(animated: true)
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-        syncRoot()
+        if !wasOpen { startFan() }
+        applyLayout(animated: true, refreshRoot: !wasOpen)
+        showNoteWindow(id)
     }
 
     func collapse() {
+        closeNoteWindow()
         previewID = nil
-        mode = hoverInside ? .peek : .dormant
+        if hoverInside {
+            mode = .peek
+            fanOpen = true
+        } else {
+            fanOpen = false
+            mode = .dormant
+        }
         applyLayout(animated: true)
         syncRoot()
     }
@@ -140,6 +155,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         if inside {
             if mode == .dormant {
                 mode = .peek
+                startFan()
                 applyLayout(animated: true)
                 syncRoot()
             }
@@ -148,6 +164,7 @@ final class DeckController: NSObject, NSWindowDelegate {
                 try? await Task.sleep(nanoseconds: 220_000_000)
                 guard let self, !self.hoverInside, self.mode == .peek else { return }
                 self.previewID = nil
+                self.fanOpen = false
                 self.mode = .dormant
                 self.applyLayout(animated: true)
                 self.syncRoot()
@@ -161,7 +178,7 @@ final class DeckController: NSObject, NSWindowDelegate {
             return
         }
         handleHover(true)
-        guard mode == .peek else { return }
+        guard mode == .peek || isExpanded else { return }
         let yFromTop = hosting.isFlipped ? point.y : (hosting.bounds.height - point.y)
         if let id = tabID(atYFromTop: yFromTop) {
             setPreview(id)
@@ -169,7 +186,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     func setPreview(_ id: UUID?) {
-        guard mode == .peek else { return }
+        guard mode == .peek || isExpanded else { return }
         guard previewID != id else { return }
         let widthChanged = (previewID == nil) != (id == nil)
         previewID = id
@@ -194,7 +211,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     func syncPreviewToMouse() {
-        guard mode == .peek else { return }
+        guard mode == .peek || isExpanded else { return }
         let screenRect = NSRect(origin: NSEvent.mouseLocation, size: .zero)
         let windowPoint = panel.convertFromScreen(screenRect).origin
         let point = hosting.convert(windowPoint, from: nil)
@@ -212,6 +229,13 @@ final class DeckController: NSObject, NSWindowDelegate {
         expand(item.id)
     }
 
+    func startFan() {
+        fanOpen = false
+        Task { @MainActor in
+            self.fanOpen = true
+        }
+    }
+
     func applyFullscreenPreference() {
         if store.showOverFullscreen {
             panel.level = .screenSaver
@@ -220,6 +244,7 @@ final class DeckController: NSObject, NSWindowDelegate {
             panel.level = .statusBar
             panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         }
+        noteWindow?.applyLevel(overFullscreen: store.showOverFullscreen)
     }
 
     func rebuildMenu() {
@@ -269,28 +294,14 @@ final class DeckController: NSObject, NSWindowDelegate {
                 width: width + 1,
                 height: height
             )
-        case .peek:
+        case .peek, .expanded:
             let stack = tabStackHeight(count: max(items.count, 1))
-            let extra = previewID == nil ? 0 : DeckMetrics.previewWidth
+            let extra = (previewID == nil && !isExpanded) ? 0 : DeckMetrics.peekNudge
             let height = stack + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
             let width = DeckMetrics.tabWidth + extra + pad
             return NSRect(
                 x: vf.maxX - DeckMetrics.tabWidth - extra,
                 y: top - stack - DeckMetrics.plusSize - DeckMetrics.plusGap,
-                width: width,
-                height: height
-            )
-        case .expanded(let id):
-            let stack = tabStackHeight(count: max(items.count, 1))
-            let index = items.firstIndex(where: { $0.id == id }) ?? 0
-            let noteTopOffset = CGFloat(index) * DeckMetrics.tabStride
-            let noteBottomNeeded = noteTopOffset + DeckMetrics.noteMinHeight
-            let contentHeight = max(stack + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
-            let width = DeckMetrics.noteWidth + DeckMetrics.tabWidth + pad
-            let height = contentHeight + pad + DeckMetrics.topGutter
-            return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - DeckMetrics.noteWidth,
-                y: top - contentHeight,
                 width: width,
                 height: height
             )
@@ -326,6 +337,54 @@ final class DeckController: NSObject, NSWindowDelegate {
     func syncRoot() {
         hosting.rootView = DeckRoot(store: store, deck: self)
         panel.menu = AppDelegate.shared.buildMenu()
+        if isExpanded {
+            noteWindow?.refreshContent()
+        }
+    }
+
+    private func showNoteWindow(_ id: UUID) {
+        if noteWindow == nil {
+            let controller = NoteWindowController(store: store)
+            controller.onClosed = { [weak self] in
+                guard let self else { return }
+                self.noteWindow = nil
+                if case .expanded = self.mode {
+                    self.previewID = nil
+                    if self.hoverInside {
+                        self.mode = .peek
+                        self.fanOpen = true
+                    } else {
+                        self.fanOpen = false
+                        self.mode = .dormant
+                    }
+                    self.applyLayout(animated: true)
+                    self.syncRoot()
+                }
+            }
+            noteWindow = controller
+        }
+        noteWindow?.present(id: id, near: noteFrame(for: id), overFullscreen: store.showOverFullscreen)
+    }
+
+    private func closeNoteWindow() {
+        noteWindow?.closeQuietly()
+        noteWindow = nil
+    }
+
+    private func noteFrame(for id: UUID) -> NSRect {
+        let items = store.visibleDeckItems
+        let index = items.firstIndex(where: { $0.id == id }) ?? 0
+        let width = DeckMetrics.noteWindowWidth
+        let height = DeckMetrics.noteWindowHeight
+        guard let screen = assignedScreen() else {
+            return NSRect(x: 80, y: 80, width: width, height: height)
+        }
+        let vf = screen.visibleFrame
+        let top = vf.minY + vf.height * 0.72
+        let tabTop = top - CGFloat(index) * DeckMetrics.tabStride
+        let x = vf.maxX - DeckMetrics.tabWidth - width - 20
+        let y = tabTop - height + DeckMetrics.tabHeight
+        return NSRect(x: x, y: y, width: width, height: height)
     }
 
     private func installOutsideClickMonitor() {
@@ -345,11 +404,18 @@ final class DeckController: NSObject, NSWindowDelegate {
     private func collapseIfClickOutside() {
         guard case .expanded = mode else { return }
         let loc = NSEvent.mouseLocation
-        if !panel.frame.contains(loc) {
-            mode = hoverInside ? .peek : .dormant
-            applyLayout(animated: true)
-            syncRoot()
+        if panel.frame.contains(loc) { return }
+        if let noteFrame = noteWindow?.window?.frame, noteFrame.contains(loc) { return }
+        closeNoteWindow()
+        if hoverInside {
+            mode = .peek
+            fanOpen = true
+        } else {
+            fanOpen = false
+            mode = .dormant
         }
+        applyLayout(animated: true)
+        syncRoot()
     }
 }
 

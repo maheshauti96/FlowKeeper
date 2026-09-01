@@ -118,7 +118,7 @@ final class FlowStore {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if q.isEmpty { return true }
         let actorName = actor(for: item.actorID)?.name.lowercased() ?? ""
-        let hay = ([item.title, item.body, status(for: item.statusID).name, actorName] + item.tags)
+        let hay = ([item.title, item.body, item.tabName, status(for: item.statusID).name, actorName] + item.tags)
             .joined(separator: " ")
             .lowercased()
         return hay.contains(q)
@@ -396,6 +396,13 @@ final class FlowStore {
         Binding(
             get: { self.items.first(where: { $0.id == id })?.body ?? "" },
             set: { newValue in self.update(id) { $0.body = newValue } }
+        )
+    }
+
+    func tabNameBinding(_ id: UUID) -> Binding<String> {
+        Binding(
+            get: { self.items.first(where: { $0.id == id })?.tabName ?? "" },
+            set: { newValue in self.update(id) { $0.tabName = newValue } }
         )
     }
 

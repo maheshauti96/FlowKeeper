@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct DeckView: View {
@@ -46,56 +47,77 @@ struct DeckView: View {
             .shadow(color: .black.opacity(0.18), radius: 6, x: -1, y: 1)
             .onTapGesture {
                 deck.mode = .peek
+                deck.startFan()
                 deck.applyLayout(animated: true)
                 deck.syncRoot()
             }
     }
 
     private var openDeck: some View {
-        HStack(alignment: .top, spacing: 0) {
-            if case .expanded(let id) = deck.mode, let item = store.items.first(where: { $0.id == id }) {
-                ExpandedNote(store: store, item: item, deck: deck)
-                    .frame(width: DeckMetrics.noteWidth, height: DeckMetrics.noteMinHeight)
-                    .padding(.top, CGFloat(items.firstIndex(where: { $0.id == id }) ?? 0) * DeckMetrics.tabStride)
-            } else if let previewID = deck.previewID,
-                      let item = store.items.first(where: { $0.id == previewID }),
-                      let index = items.firstIndex(where: { $0.id == previewID }) {
-                PeekPreview(
+        OpenDeckStack(store: store, deck: deck, items: items)
+    }
+
+    @ViewBuilder
+    private var deckMenu: some View {
+        Button("New idea") { deck.createAndExpand(statusID: FlowStatus.ideaID) }
+        Button("Board") { deck.onOpenBoard?() }
+        Button("All Flows") { deck.onOpenLibrary?(.all) }
+        Button("Archive") { deck.onOpenLibrary?(.status(FlowStatus.archivedID)) }
+        Divider()
+        Button(store.showOverFullscreen ? "Don’t show over full-screen apps" : "Show over full-screen apps") {
+            store.showOverFullscreen.toggle()
+            store.saveNow()
+            deck.applyFullscreenPreference()
+            AppDelegate.shared.rebuildMenu()
+        }
+        Divider()
+        Button("Quit Flow Keeper") { deck.onQuit?() }
+    }
+}
+
+struct OpenDeckStack: View {
+    var store: FlowStore
+    var deck: DeckController
+    var items: [FlowItem]
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: DeckMetrics.tabStride - DeckMetrics.tabHeight) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                let selected: Bool = {
+                    if case .expanded(let id) = deck.mode { return id == item.id }
+                    return false
+                }()
+                PeekSpine(
                     item: item,
-                    status: store.status(for: item.statusID),
-                    actorName: store.actor(for: item.actorID)?.name
+                    selected: selected,
+                    peeked: deck.previewID == item.id,
+                    index: index,
+                    appeared: deck.fanOpen
                 )
-                    .padding(.top, CGFloat(index) * DeckMetrics.tabStride)
-                    .onTapGesture { deck.openFromClick(item.id) }
+                .onTapGesture { deck.openFromClick(item.id) }
+                .contextMenu { itemMenu(item) }
             }
 
-            VStack(alignment: .trailing, spacing: DeckMetrics.tabStride - DeckMetrics.tabHeight) {
-                ForEach(items) { item in
-                    let selected: Bool = {
-                        if case .expanded(let id) = deck.mode { return id == item.id }
-                        return false
-                    }()
-                    PeekSpine(item: item, selected: selected)
-                        .onTapGesture { deck.openFromClick(item.id) }
-                        .contextMenu { itemMenu(item) }
-                }
-
-                plusButton
-                    .padding(.top, DeckMetrics.plusGap)
-                    .padding(.trailing, 2)
-            }
+            plusButton
+                .padding(.top, DeckMetrics.plusGap)
+                .padding(.trailing, 1)
+                .opacity(deck.fanOpen ? 1 : 0)
+                .animation(
+                    .easeOut(duration: 0.18).delay(Double(max(items.count, 1)) * DeckMetrics.fanStagger),
+                    value: deck.fanOpen
+                )
         }
         .padding(.top, DeckMetrics.topGutter)
         .padding(.leading, DeckMetrics.shadowPad)
         .overlay(alignment: .topTrailing) {
             if store.hiddenDeckCount > 0 {
                 Text("+\(store.hiddenDeckCount)")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.black.opacity(0.55)))
-                    .offset(x: -36, y: 4)
+                    .background(Capsule().fill(Color.black.opacity(0.45)))
+                    .offset(x: -28, y: 4)
                     .onTapGesture { AppDelegate.shared.openLibrary(filter: .onDeck) }
             }
         }
@@ -124,7 +146,7 @@ struct DeckView: View {
                     .fill(.ultraThinMaterial)
                     .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 0.6))
                 Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Palette.ink)
             }
             .frame(width: DeckMetrics.plusSize, height: DeckMetrics.plusSize)
@@ -149,25 +171,9 @@ struct DeckView: View {
     }
 
     @ViewBuilder
-    private var deckMenu: some View {
-        Button("New idea") { deck.createAndExpand(statusID: FlowStatus.ideaID) }
-        Button("Board") { deck.onOpenBoard?() }
-        Button("All Flows") { deck.onOpenLibrary?(.all) }
-        Button("Archive") { deck.onOpenLibrary?(.status(FlowStatus.archivedID)) }
-        Divider()
-        Button(store.showOverFullscreen ? "Don’t show over full-screen apps" : "Show over full-screen apps") {
-            store.showOverFullscreen.toggle()
-            store.saveNow()
-            deck.applyFullscreenPreference()
-            AppDelegate.shared.rebuildMenu()
-        }
-        Divider()
-        Button("Quit Flow Keeper") { deck.onQuit?() }
-    }
-
-    @ViewBuilder
     private func itemMenu(_ item: FlowItem) -> some View {
         Button("Open") { deck.expand(item.id) }
+        Button("Rename tab…") { renameTab(item) }
         Menu("Move to") {
             ForEach(store.orderedStatuses) { status in
                 Button(status.name) { store.move(item.id, to: status.id) }
@@ -193,18 +199,36 @@ struct DeckView: View {
             if case .expanded(let id) = deck.mode, id == item.id { deck.collapse() }
         }
     }
+
+    private func renameTab(_ item: FlowItem) {
+        let alert = NSAlert()
+        alert.messageText = "Tab name"
+        alert.informativeText = "Short label on the edge. Clear it to use a word from the title."
+        alert.addButton(withTitle: "Set")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(string: item.tabName)
+        field.placeholderString = FlowItem.shortTabName(from: item.displayTitle)
+        field.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        store.update(item.id) { $0.tabName = field.stringValue }
+    }
 }
 
 struct PeekSpine: View {
     var item: FlowItem
     var selected: Bool
+    var peeked: Bool
+    var index: Int
+    var appeared: Bool
 
     var body: some View {
         ZStack {
             Text(item.tabLabel)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
-                .tracking(1.1)
-                .foregroundStyle(item.swatch.ink.opacity(0.82))
+                .font(.system(size: 9, weight: .medium))
+                .tracking(1.6)
+                .foregroundStyle(item.swatch.ink.opacity(0.78))
                 .lineLimit(1)
                 .rotationEffect(.degrees(90))
                 .frame(width: DeckMetrics.tabHeight - 16, height: DeckMetrics.tabWidth)
@@ -212,125 +236,20 @@ struct PeekSpine: View {
         .frame(width: DeckMetrics.tabWidth, height: DeckMetrics.tabHeight)
         .background(
             UnevenRoundedRectangle(
-                cornerRadii: .init(topLeading: 13, bottomLeading: 13, bottomTrailing: 0, topTrailing: 0)
+                cornerRadii: .init(topLeading: 11, bottomLeading: 11, bottomTrailing: 0, topTrailing: 0)
             )
             .fill(item.swatch.fill)
-            .shadow(color: .black.opacity(selected ? 0.2 : 0.12), radius: 5, x: -1, y: 1)
+            .shadow(color: .black.opacity(selected || peeked ? 0.22 : 0.11), radius: peeked ? 8 : 5, x: -1, y: 1)
         )
+        .overlay(alignment: .leading) {
+            DashedFold(color: item.swatch.ink)
+                .padding(.vertical, 12)
+                .padding(.leading, 5)
+        }
+        .offset(x: appeared ? (peeked || selected ? -DeckMetrics.peekNudge : 0) : 18)
+        .opacity(appeared ? 1 : 0)
+        .animation(.easeOut(duration: 0.2).delay(Double(index) * DeckMetrics.fanStagger), value: appeared)
         .contentShape(Rectangle())
         .accessibilityLabel(item.displayTitle)
-    }
-}
-
-struct PeekPreview: View {
-    var item: FlowItem
-    var status: FlowStatus
-    var actorName: String?
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.displayTitle)
-                    .font(NoteFont.title(18))
-                    .foregroundStyle(item.swatch.ink)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
-                    StageChip(status: status)
-                    if let actorName {
-                        Text(actorName)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(item.swatch.ink.opacity(0.55))
-                    }
-                }
-            }
-            .padding(.leading, 14)
-            .padding(.trailing, 8)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            DashedFold(color: item.swatch.ink)
-        }
-        .frame(width: DeckMetrics.previewWidth, height: DeckMetrics.tabHeight)
-        .background(
-            UnevenRoundedRectangle(
-                cornerRadii: .init(topLeading: 13, bottomLeading: 13, bottomTrailing: 0, topTrailing: 0)
-            )
-            .fill(item.swatch.fill)
-            .shadow(color: .black.opacity(0.22), radius: 12, x: -2, y: 2)
-        )
-        .accessibilityLabel(item.displayTitle)
-    }
-}
-
-struct ExpandedNote: View {
-    var store: FlowStore
-    var item: FlowItem
-    var deck: DeckController
-
-    var body: some View {
-        let swatch = item.swatch
-        HStack(spacing: 0) {
-            ZStack {
-                Text(item.tabLabel)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(swatch.ink.opacity(0.82))
-                    .lineLimit(1)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 86, height: 22)
-            }
-            .frame(width: 28)
-
-            DashedFold(color: swatch.ink)
-                .padding(.vertical, 4)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    TextField("Title", text: store.titleBinding(item.id))
-                        .textFieldStyle(.plain)
-                        .font(NoteFont.title(22))
-                        .foregroundStyle(swatch.ink)
-                    Button {
-                        deck.collapse()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(swatch.ink.opacity(0.45))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                NoteBodyView(
-                    text: store.bodyBinding(item.id),
-                    font: NoteFont.nsBody,
-                    color: swatch.nsInk.withAlphaComponent(0.9)
-                )
-
-                HStack(spacing: 8) {
-                    ActorAssignMenu(store: store, item: item)
-                    StageAssignMenu(store: store, item: item)
-                    Spacer()
-                    Button {
-                        store.cycleColor(item.id)
-                    } label: {
-                        Circle().fill(swatch.dash).frame(width: 10, height: 10)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Cycle colour (⌘.)")
-                }
-                .padding(.top, 2)
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 14)
-            .padding(.vertical, 12)
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(swatch.fill)
-                .shadow(color: .black.opacity(0.22), radius: 16, x: -2, y: 4)
-        )
-        .onExitCommand { deck.collapse() }
     }
 }

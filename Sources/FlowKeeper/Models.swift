@@ -142,6 +142,7 @@ struct FlowItem: Identifiable, Hashable {
     var createdAt: Date
     var updatedAt: Date
     var rank: Double
+    var tabName: String = ""
 
     var displayTitle: String {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -152,10 +153,21 @@ struct FlowItem: Identifiable, Hashable {
     }
 
     var tabLabel: String {
-        let raw = displayTitle.uppercased()
-        let compact = raw.replacingOccurrences(of: " ", with: "-")
-        if compact.count <= 10 { return compact }
-        return String(compact.prefix(9))
+        let custom = tabName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !custom.isEmpty { return custom }
+        return Self.shortTabName(from: displayTitle)
+    }
+
+    static func shortTabName(from title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Note" }
+        let stops: Set<String> = ["a", "an", "the", "for", "of", "and", "to", "in", "on", "at", "vs"]
+        let words = trimmed.split(whereSeparator: \.isWhitespace).map(String.init)
+        let chosen = words.first { !stops.contains($0.lowercased()) } ?? words[0]
+        let cleaned = chosen.trimmingCharacters(in: CharacterSet.punctuationCharacters)
+        let word = cleaned.isEmpty ? chosen : cleaned
+        if word.count <= 14 { return word }
+        return String(word.prefix(14))
     }
 
     var preview: String {
@@ -168,7 +180,7 @@ struct FlowItem: Identifiable, Hashable {
 
 extension FlowItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, title, body, colorID, statusID, stage, actorID, tags, onDeck, createdAt, updatedAt, rank
+        case id, title, body, colorID, statusID, stage, actorID, tags, onDeck, createdAt, updatedAt, rank, tabName
     }
 
     init(from decoder: Decoder) throws {
@@ -190,6 +202,7 @@ extension FlowItem: Codable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
         rank = try c.decode(Double.self, forKey: .rank)
+        tabName = try c.decodeIfPresent(String.self, forKey: .tabName) ?? ""
     }
 
     func encode(to encoder: Encoder) throws {
@@ -205,6 +218,7 @@ extension FlowItem: Codable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encode(rank, forKey: .rank)
+        try c.encode(tabName, forKey: .tabName)
     }
 }
 
