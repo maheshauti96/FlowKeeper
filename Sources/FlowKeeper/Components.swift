@@ -8,7 +8,7 @@ struct NoteBodyView: NSViewRepresentable {
     var showsScroller: Bool = false
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: text)
+        Coordinator(text: text, font: font, color: color)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -22,9 +22,12 @@ struct NoteBodyView: NSViewRepresentable {
         scroll.scrollerStyle = .overlay
         scroll.verticalScrollElasticity = .allowed
 
-        let tv = NSTextView()
-        tv.delegate = context.coordinator
-        tv.isRichText = false
+        let tv = MarkdownNoteTextView()
+        tv.isRichText = true
+        tv.importsGraphics = false
+        tv.allowsImageEditing = false
+        tv.styleFont = font
+        tv.styleColor = color
         tv.font = font
         tv.textColor = color
         tv.insertionPointColor = color
@@ -38,29 +41,46 @@ struct NoteBodyView: NSViewRepresentable {
         tv.textContainerInset = NSSize(width: 0, height: 2)
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
+        tv.isAutomaticTextReplacementEnabled = false
+        tv.enabledTextCheckingTypes = 0
         tv.string = text.wrappedValue
+        tv.onPlainTextChange = { [weak coord = context.coordinator] value in
+            coord?.text.wrappedValue = value
+        }
+        tv.restyle()
         scroll.documentView = tv
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.text = text
-        guard let tv = scroll.documentView as? NSTextView else { return }
+        context.coordinator.font = font
+        context.coordinator.color = color
+        guard let tv = scroll.documentView as? MarkdownNoteTextView else { return }
+        tv.onPlainTextChange = { [weak coord = context.coordinator] value in
+            coord?.text.wrappedValue = value
+        }
+        tv.insertionPointColor = color
+        let fontChanged = tv.styleFont.fontName != font.fontName || tv.styleFont.pointSize != font.pointSize
+        let colorChanged = !tv.styleColor.isEqual(color)
+        tv.styleFont = font
+        tv.styleColor = color
         if tv.string != text.wrappedValue {
             tv.string = text.wrappedValue
+        } else if fontChanged || colorChanged {
+            tv.restyle()
         }
-        tv.font = font
-        tv.textColor = color
-        tv.insertionPointColor = color
         scroll.hasVerticalScroller = showsScroller
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator {
         var text: Binding<String>
-        init(text: Binding<String>) { self.text = text }
-        func textDidChange(_ notification: Notification) {
-            guard let tv = notification.object as? NSTextView else { return }
-            text.wrappedValue = tv.string
+        var font: NSFont
+        var color: NSColor
+        init(text: Binding<String>, font: NSFont, color: NSColor) {
+            self.text = text
+            self.font = font
+            self.color = color
         }
     }
 }
