@@ -404,11 +404,34 @@ struct BoardCard: View {
             }
         }
         .padding(10)
+        .padding(.top, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
         )
+        .overlay(alignment: .topLeading) {
+            Button {
+                session.beginEdit(item)
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Palette.inkMuted)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Palette.cream)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Palette.hairline, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Edit flow")
+            .accessibilityLabel("Edit flow")
+            .padding(6)
+        }
         .onTapGesture { session.beginEdit(item) }
         .contextMenu {
             Button("Open on deck") { onReveal(item.id) }
