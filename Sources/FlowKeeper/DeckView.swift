@@ -52,12 +52,24 @@ struct DeckView: View {
             }
     }
 
-    private var openDeck: some View {
-        HStack(alignment: .top, spacing: 0) {
+    private var drawerSlotWidth: CGFloat {
+        if case .expanded = deck.mode {
+            return deck.expandedSize.width
+        }
+        if deck.previewID != nil {
+            return DeckMetrics.previewWidth
+        }
+        return 0
+    }
+
+    @ViewBuilder
+    private var drawerPaper: some View {
+        ZStack(alignment: .topTrailing) {
             if case .expanded(let id) = deck.mode, let item = store.items.first(where: { $0.id == id }) {
                 ExpandedNote(store: store, item: item, deck: deck)
                     .frame(width: deck.expandedSize.width, height: deck.expandedSize.height)
                     .padding(.top, CGFloat(items.firstIndex(where: { $0.id == id }) ?? 0) * DeckMetrics.tabStride)
+                    .offset(x: deck.drawerOpen ? 0 : deck.expandedSize.width)
             } else if let previewID = deck.previewID,
                       let item = store.items.first(where: { $0.id == previewID }),
                       let index = items.firstIndex(where: { $0.id == previewID }) {
@@ -66,9 +78,20 @@ struct DeckView: View {
                     status: store.status(for: item.statusID),
                     actorName: store.actor(for: item.actorID)?.name
                 )
+                    .id(previewID)
                     .padding(.top, CGFloat(index) * DeckMetrics.tabStride)
+                    .offset(x: deck.drawerOpen ? 0 : DeckMetrics.previewWidth)
                     .onTapGesture { deck.openFromClick(item.id) }
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+    }
+
+    private var openDeck: some View {
+        HStack(alignment: .top, spacing: 0) {
+            drawerPaper
+                .frame(width: drawerSlotWidth)
+                .clipped()
 
             VStack(alignment: .trailing, spacing: DeckMetrics.tabStride - DeckMetrics.tabHeight) {
                 ForEach(items) { item in
@@ -106,7 +129,6 @@ struct DeckView: View {
                     .padding(.bottom, 8)
             }
         }
-        .animation(.easeOut(duration: 0.12), value: deck.previewID)
         .animation(.easeOut(duration: 0.16), value: deck.mode)
     }
 

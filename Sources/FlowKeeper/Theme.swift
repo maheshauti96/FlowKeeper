@@ -26,6 +26,7 @@ enum DeckMetrics {
     static let shadowPad: CGFloat = 22
     static let topGutter: CGFloat = 18
     static let maxVisibleTabs = 8
+    static let drawerDuration: TimeInterval = 0.32
 }
 
 struct StickySwatch: Identifiable, Hashable {
