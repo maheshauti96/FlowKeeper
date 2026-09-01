@@ -291,18 +291,9 @@ struct ExpandedNote: View {
                     Button {
                         AppDelegate.shared.openBoard(editing: item)
                     } label: {
-                        Image(systemName: "square.and.pencil")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Palette.ink)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .fill(Color.white)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .stroke(Color.black.opacity(0.28), lineWidth: 1.2)
-                            )
+                        Image(systemName: "pencil")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(swatch.ink.opacity(0.5))
                     }
                     .buttonStyle(.plain)
                     .help("Edit on board")
