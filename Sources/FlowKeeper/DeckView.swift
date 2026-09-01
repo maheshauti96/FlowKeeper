@@ -46,67 +46,27 @@ struct DeckView: View {
             .frame(width: DeckMetrics.pillWidth, height: CGFloat(max(count, 1)) * 16 + 20)
             .shadow(color: .black.opacity(0.18), radius: 6, x: -1, y: 1)
             .onTapGesture {
-                deck.mode = .peek
-                deck.applyLayout(animated: true)
-                deck.syncRoot()
+                deck.enterPeek(fromTap: true)
             }
-    }
-
-    private var drawerSlotWidth: CGFloat {
-        if case .expanded = deck.mode {
-            return deck.expandedSize.width
-        }
-        return DeckMetrics.previewWidth
-    }
-
-    @ViewBuilder
-    private var drawerPaper: some View {
-        ZStack(alignment: .topTrailing) {
-            if case .expanded(let id) = deck.mode, let item = store.items.first(where: { $0.id == id }) {
-                ExpandedNote(store: store, item: item, deck: deck)
-                    .frame(width: deck.expandedSize.width, height: deck.expandedSize.height)
-                    .padding(.top, CGFloat(items.firstIndex(where: { $0.id == id }) ?? 0) * DeckMetrics.tabStride)
-                    .offset(x: deck.drawerOpen ? 0 : deck.expandedSize.width)
-            } else if let previewID = deck.previewID,
-                      let item = store.items.first(where: { $0.id == previewID }),
-                      let index = items.firstIndex(where: { $0.id == previewID }) {
-                PeekPreview(
-                    item: item,
-                    status: store.status(for: item.statusID),
-                    actorName: store.actor(for: item.actorID)?.name
-                )
-                    .id(previewID)
-                    .padding(.top, CGFloat(index) * DeckMetrics.tabStride)
-                    .offset(x: deck.drawerOpen ? 0 : DeckMetrics.previewWidth)
-                    .onTapGesture { deck.openFromClick(item.id) }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 
     private var openDeck: some View {
-        HStack(alignment: .top, spacing: 0) {
-            drawerPaper
-                .frame(width: drawerSlotWidth)
-
-            VStack(alignment: .trailing, spacing: DeckMetrics.tabStride - DeckMetrics.tabHeight) {
-                ForEach(items) { item in
-                    let selected: Bool = {
-                        if case .expanded(let id) = deck.mode { return id == item.id }
-                        return false
-                    }()
-                    PeekSpine(item: item, selected: selected)
-                        .onTapGesture { deck.openFromClick(item.id) }
-                        .contextMenu { itemMenu(item) }
-                }
-
-                plusButton
-                    .padding(.top, DeckMetrics.plusGap)
-                    .padding(.trailing, 2)
+        ZStack(alignment: .topTrailing) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                let selected = isSelected(item)
+                NoteSheet(store: store, item: item, deck: deck, revealed: index < deck.fanCount)
+                    .zIndex(selected ? 40 : Double(index))
+                    .padding(.top, DeckMetrics.topGutter + CGFloat(index) * DeckMetrics.tabStride)
+                    .onTapGesture { deck.openFromClick(item.id) }
+                    .contextMenu { itemMenu(item) }
             }
+
+            plusButton
+                .padding(.top, DeckMetrics.topGutter + deck.tabStackHeight(count: max(items.count, 1)) + DeckMetrics.plusGap)
+                .padding(.trailing, 2)
+                .zIndex(5)
         }
-        .padding(.top, DeckMetrics.topGutter)
-        .padding(.leading, DeckMetrics.shadowPad)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .overlay(alignment: .topTrailing) {
             if store.hiddenDeckCount > 0 {
                 Text("+\(store.hiddenDeckCount)")
@@ -125,7 +85,11 @@ struct DeckView: View {
                     .padding(.bottom, 8)
             }
         }
-        .animation(.easeOut(duration: 0.16), value: deck.mode)
+    }
+
+    private func isSelected(_ item: FlowItem) -> Bool {
+        if case .expanded(let id) = deck.mode, id == item.id { return true }
+        return deck.previewID == item.id
     }
 
     private var plusButton: some View {
@@ -214,11 +178,118 @@ struct DeckView: View {
     }
 }
 
-struct PeekSpine: View {
+private enum SheetPhase: Equatable {
+    case hidden
+    case tab
+    case peek
+    case expanded
+}
+
+struct NoteSheet: View {
+    var store: FlowStore
     var item: FlowItem
-    var selected: Bool
+    var deck: DeckController
+    var revealed: Bool
+
+    private var phase: SheetPhase {
+        if !revealed { return .hidden }
+        if case .expanded(let id) = deck.mode, id == item.id { return .expanded }
+        if deck.previewID == item.id { return .peek }
+        return .tab
+    }
+
+    private var sheetWidth: CGFloat {
+        switch phase {
+        case .hidden: return 0
+        case .tab: return DeckMetrics.tabWidth
+        case .peek: return DeckMetrics.peekSheetWidth
+        case .expanded: return max(deck.expandedSize.width, DeckMetrics.peekSheetWidth)
+        }
+    }
+
+    private var sheetHeight: CGFloat {
+        switch phase {
+        case .hidden: return DeckMetrics.tabHeight
+        case .tab, .peek: return DeckMetrics.tabHeight
+        case .expanded: return deck.expandedSize.height
+        }
+    }
+
+    private var interiorWidth: CGFloat {
+        max(0, sheetWidth - DeckMetrics.tabWidth)
+    }
+
+    private var showInterior: Bool {
+        phase == .peek || phase == .expanded
+    }
+
+    private var paperShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            cornerRadii: .init(topLeading: 13, bottomLeading: 13, bottomTrailing: 0, topTrailing: 0)
+        )
+    }
 
     var body: some View {
+        HStack(spacing: 0) {
+            tabStrip
+
+            HStack(spacing: 0) {
+                DashedFold(color: item.swatch.ink)
+                    .padding(.vertical, phase == .expanded ? 4 : 0)
+
+                if phase == .expanded {
+                    expandedInterior
+                } else {
+                    peekInterior
+                }
+            }
+            .frame(width: interiorWidth, height: sheetHeight, alignment: .topLeading)
+            .opacity(showInterior ? 1 : 0)
+            .allowsHitTesting(showInterior)
+        }
+        .frame(width: sheetWidth, height: sheetHeight, alignment: .topLeading)
+        .background(paperShape.fill(item.swatch.fill))
+        .clipShape(paperShape)
+        .contentShape(paperShape)
+        .shadow(color: .black.opacity(showInterior ? 0.22 : 0.12), radius: showInterior ? 12 : 5, x: -2, y: 2)
+        .opacity(phase == .hidden ? 0 : 1)
+        .animation(DeckController.drawerAnimation, value: sheetWidth)
+        .animation(DeckController.drawerAnimation, value: sheetHeight)
+        .animation(DeckController.drawerAnimation, value: showInterior)
+        .animation(DeckController.drawerAnimation, value: phase)
+        .accessibilityLabel(item.displayTitle)
+        .overlay(alignment: .leading) {
+            if phase == .expanded { resizeEdge(widthSign: -1, heightSign: 0, width: 8, height: nil) }
+        }
+        .overlay(alignment: .bottom) {
+            if phase == .expanded { resizeEdge(widthSign: 0, heightSign: 1, width: nil, height: 8) }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if phase == .expanded {
+                Color.clear
+                    .frame(width: 16, height: 16)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        if hovering { NSCursor.crosshair.push() }
+                        else { NSCursor.pop() }
+                    }
+                    .gesture(resizeGesture(widthSign: -1, heightSign: 1))
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if phase == .expanded {
+                PaperResizeGrip(ink: item.swatch.ink)
+                    .gesture(resizeGesture(widthSign: 1, heightSign: 1))
+                    .padding(.trailing, 6)
+                    .padding(.bottom, 6)
+            }
+        }
+        .onExitCommand {
+            if phase == .expanded { deck.collapse() }
+        }
+    }
+
+    private var tabStrip: some View {
         ZStack {
             Text(item.tabLabel)
                 .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -228,186 +299,111 @@ struct PeekSpine: View {
                 .rotationEffect(.degrees(90))
                 .frame(width: DeckMetrics.tabHeight - 16, height: DeckMetrics.tabWidth)
         }
-        .frame(width: DeckMetrics.tabWidth, height: DeckMetrics.tabHeight)
-        .background(
-            UnevenRoundedRectangle(
-                cornerRadii: .init(topLeading: 13, bottomLeading: 13, bottomTrailing: 0, topTrailing: 0)
-            )
-            .fill(item.swatch.fill)
-            .shadow(color: .black.opacity(selected ? 0.2 : 0.12), radius: 5, x: -1, y: 1)
-        )
-        .contentShape(Rectangle())
-        .accessibilityLabel(item.displayTitle)
+        .frame(width: DeckMetrics.tabWidth, height: min(sheetHeight, DeckMetrics.tabHeight))
+        .frame(maxHeight: .infinity, alignment: .top)
     }
-}
 
-struct PeekPreview: View {
-    var item: FlowItem
-    var status: FlowStatus
-    var actorName: String?
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(item.displayTitle)
-                    .font(NoteFont.title(18))
-                    .foregroundStyle(item.swatch.ink)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6) {
-                    StageChip(status: status)
-                    if let actorName {
-                        Text(actorName)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(item.swatch.ink.opacity(0.55))
-                    }
+    private var peekInterior: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(item.displayTitle)
+                .font(NoteFont.title(18))
+                .foregroundStyle(item.swatch.ink)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                StageChip(status: store.status(for: item.statusID))
+                if let actorName = store.actor(for: item.actorID)?.name {
+                    Text(actorName)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(item.swatch.ink.opacity(0.55))
                 }
             }
-            .padding(.leading, 14)
-            .padding(.trailing, 8)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            DashedFold(color: item.swatch.ink)
         }
-        .frame(width: DeckMetrics.previewWidth, height: DeckMetrics.tabHeight)
-        .background(
-            UnevenRoundedRectangle(
-                cornerRadii: .init(topLeading: 13, bottomLeading: 13, bottomTrailing: 0, topTrailing: 0)
-            )
-            .fill(item.swatch.fill)
-            .shadow(color: .black.opacity(0.22), radius: 12, x: -2, y: 2)
-        )
-        .accessibilityLabel(item.displayTitle)
+        .padding(.leading, 12)
+        .padding(.trailing, 10)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
-}
 
-struct ExpandedNote: View {
-    var store: FlowStore
-    var item: FlowItem
-    var deck: DeckController
-
-    var body: some View {
+    private var expandedInterior: some View {
         let swatch = item.swatch
-        HStack(spacing: 0) {
-            ZStack {
-                Text(item.tabLabel)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .tracking(1.1)
-                    .foregroundStyle(swatch.ink.opacity(0.82))
-                    .lineLimit(1)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 86, height: 22)
-            }
-            .frame(width: 28)
-
-            DashedFold(color: swatch.ink)
-                .padding(.vertical, 4)
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Button {
-                        AppDelegate.shared.openBoard(editing: item)
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(swatch.ink)
-                            .frame(width: 16, height: 16)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hovering in
-                        if hovering { NSCursor.pointingHand.push() }
-                        else { NSCursor.pop() }
-                    }
-                    .help("Edit on board")
-                    .accessibilityLabel("Edit on board")
-
-                    TextField("Title", text: store.titleBinding(item.id))
-                        .textFieldStyle(.plain)
-                        .font(NoteFont.title(22))
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Button {
+                    AppDelegate.shared.openBoard(editing: item)
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(swatch.ink)
-                    Button {
-                        deck.collapse()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(swatch.ink.opacity(0.45))
-                    }
-                    .buttonStyle(.plain)
+                        .frame(width: 16, height: 16)
+                        .contentShape(Rectangle())
                 }
-
-                NoteBodyView(
-                    text: store.bodyBinding(item.id),
-                    font: NoteFont.nsBody,
-                    color: swatch.nsInk.withAlphaComponent(0.9),
-                    showsScroller: true
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                HStack(spacing: 8) {
-                    ActorAssignMenu(store: store, item: item)
-                    StageAssignMenu(store: store, item: item)
-                    Spacer()
-                    Button {
-                        store.cycleColor(item.id)
-                    } label: {
-                        Circle().fill(swatch.dash).frame(width: 10, height: 10)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Cycle colour (⌘.)")
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() }
+                    else { NSCursor.pop() }
                 }
-                .padding(.top, 2)
+                .help("Edit on board")
+                .accessibilityLabel("Edit on board")
+
+                TextField("Title", text: store.titleBinding(item.id))
+                    .textFieldStyle(.plain)
+                    .font(NoteFont.title(22))
+                    .foregroundStyle(swatch.ink)
+                Button {
+                    deck.collapse()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(swatch.ink.opacity(0.45))
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.leading, 10)
-            .padding(.trailing, 14)
-            .padding(.vertical, 12)
+
+            NoteBodyView(
+                text: store.bodyBinding(item.id),
+                font: NoteFont.nsBody,
+                color: swatch.nsInk.withAlphaComponent(0.9),
+                showsScroller: true
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(swatch.fill)
-                .shadow(color: .black.opacity(0.22), radius: 16, x: -2, y: 4)
-        )
-        .overlay(alignment: .leading) {
-            Color.clear
-                .frame(width: 8)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    if hovering { NSCursor.resizeLeftRight.push() }
-                    else { NSCursor.pop() }
+
+            HStack(spacing: 8) {
+                ActorAssignMenu(store: store, item: item)
+                StageAssignMenu(store: store, item: item)
+                Spacer()
+                Button {
+                    store.cycleColor(item.id)
+                } label: {
+                    Circle().fill(swatch.dash).frame(width: 10, height: 10)
                 }
-                .gesture(resizeGesture(widthSign: -1, heightSign: 0))
+                .buttonStyle(.plain)
+                .help("Cycle colour (⌘.)")
+            }
+            .padding(.top, 2)
         }
-        .overlay(alignment: .bottom) {
-            Color.clear
-                .frame(height: 8)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    if hovering { NSCursor.resizeUpDown.push() }
-                    else { NSCursor.pop() }
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private func resizeEdge(widthSign: CGFloat, heightSign: CGFloat, width: CGFloat?, height: CGFloat?) -> some View {
+        Color.clear
+            .frame(width: width, height: height)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    if widthSign != 0 && heightSign != 0 { NSCursor.crosshair.push() }
+                    else if widthSign != 0 { NSCursor.resizeLeftRight.push() }
+                    else { NSCursor.resizeUpDown.push() }
+                } else {
+                    NSCursor.pop()
                 }
-                .gesture(resizeGesture(widthSign: 0, heightSign: 1))
-        }
-        .overlay(alignment: .bottomLeading) {
-            Color.clear
-                .frame(width: 16, height: 16)
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    if hovering { NSCursor.crosshair.push() }
-                    else { NSCursor.pop() }
-                }
-                .gesture(resizeGesture(widthSign: -1, heightSign: 1))
-        }
-        .overlay(alignment: .bottomTrailing) {
-            PaperResizeGrip(ink: swatch.ink)
-                .gesture(resizeGesture(widthSign: 1, heightSign: 1))
-                .padding(.trailing, 6)
-                .padding(.bottom, 6)
-        }
-        .onExitCommand { deck.collapse() }
+            }
+            .gesture(resizeGesture(widthSign: widthSign, heightSign: heightSign))
     }
 
     private func resizeGesture(widthSign: CGFloat, heightSign: CGFloat) -> some Gesture {

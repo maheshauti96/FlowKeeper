@@ -17,6 +17,8 @@ enum DeckMetrics {
     static let tabHeight: CGFloat = 98
     static let tabStride: CGFloat = 82
     static let previewWidth: CGFloat = 248
+    static var peekSheetWidth: CGFloat { tabWidth + previewWidth }
+    static let fanStagger: TimeInterval = 0.045
     static let noteWidth: CGFloat = 304
     static let noteMinHeight: CGFloat = 228
     static let noteResizeMinWidth: CGFloat = 240

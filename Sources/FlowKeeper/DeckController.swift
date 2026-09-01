@@ -16,7 +16,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     var mode: DeckMode = .dormant
     var hoverInside = false
     var previewID: UUID?
-    var drawerOpen = false
+    var fanCount = 0
     var expandedSize = CGSize(width: DeckMetrics.noteWidth, height: DeckMetrics.noteMinHeight)
     var isResizing = false
     var resizeOrigin: CGSize?
@@ -32,7 +32,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     private var panel: DeckPanel!
     private var hosting: DeckHostingView!
     private var leaveTask: Task<Void, Never>?
-    private var drawerTask: Task<Void, Never>?
+    private var fanTask: Task<Void, Never>?
     private var outsideMonitor: Any?
     private var localOutsideMonitor: Any?
 
@@ -96,7 +96,7 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func close() {
         leaveTask?.cancel()
-        drawerTask?.cancel()
+        fanTask?.cancel()
         if let outsideMonitor {
             NSEvent.removeMonitor(outsideMonitor)
         }
@@ -111,9 +111,9 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func forceDormant() {
         leaveTask?.cancel()
-        drawerTask?.cancel()
+        fanTask?.cancel()
         previewID = nil
-        drawerOpen = false
+        fanCount = 0
         hoverInside = false
         guard mode != .dormant else { return }
         mode = .dormant
@@ -122,41 +122,66 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     func expand(_ id: UUID) {
-        drawerTask?.cancel()
-        let keepDrawer = drawerOpen && (previewID == id)
-        previewID = nil
+        fanTask?.cancel()
+        leaveTask?.cancel()
         onWillExpand?(displayID)
         store.pinToDeck(id, pin: true)
-        mode = .expanded(id)
-        if keepDrawer {
-            drawerOpen = true
-            applyLayout(animated: true)
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-            syncRoot()
-        } else {
-            var snap = Transaction()
-            snap.animation = nil
-            withTransaction(snap) {
-                drawerOpen = false
-            }
-            applyLayout(animated: true)
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-            syncRoot()
-            withAnimation(Self.drawerAnimation) {
-                drawerOpen = true
-            }
+        withAnimation(Self.drawerAnimation) {
+            previewID = id
+            fanCount = store.visibleDeckItems.count
+            mode = .expanded(id)
         }
+        applyLayout(animated: true)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        syncRoot()
     }
 
     func collapse() {
-        drawerTask?.cancel()
-        previewID = nil
-        drawerOpen = false
-        mode = hoverInside ? .peek : .dormant
+        fanTask?.cancel()
+        leaveTask?.cancel()
+        if hoverInside {
+            withAnimation(Self.drawerAnimation) {
+                mode = .peek
+                fanCount = store.visibleDeckItems.count
+            }
+            applyLayout(animated: true)
+            syncRoot()
+        } else {
+            withAnimation(Self.drawerAnimation) {
+                previewID = nil
+                fanCount = 0
+                mode = .dormant
+            }
+            applyLayout(animated: true)
+            syncRoot()
+        }
+    }
+
+    func enterPeek(fromTap: Bool = false) {
+        guard mode == .dormant else { return }
+        mode = .peek
         applyLayout(animated: true)
         syncRoot()
+        startFan()
+    }
+
+    private func startFan() {
+        fanTask?.cancel()
+        let count = store.visibleDeckItems.count
+        fanCount = 0
+        fanTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for i in 0..<count {
+                guard !Task.isCancelled else { return }
+                guard self.mode == .peek || self.isExpanded else { return }
+                withAnimation(Self.drawerAnimation) {
+                    self.fanCount = i + 1
+                }
+                let ns = UInt64(DeckMetrics.fanStagger * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: ns)
+            }
+        }
     }
 
     func openFromClick(_ id: UUID) {
@@ -176,26 +201,25 @@ final class DeckController: NSObject, NSWindowDelegate {
         leaveTask?.cancel()
         if inside {
             if mode == .dormant {
-                mode = .peek
-                applyLayout(animated: true)
-                syncRoot()
+                enterPeek()
             }
         } else if mode == .peek {
             leaveTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 220_000_000)
                 guard let self, !self.hoverInside, self.mode == .peek else { return }
-                self.drawerTask?.cancel()
-                if self.drawerOpen || self.previewID != nil {
+                if self.previewID != nil {
                     withAnimation(Self.drawerAnimation) {
-                        self.drawerOpen = false
+                        self.previewID = nil
                     }
-                    self.applyLayout(animated: true, refreshRoot: false)
                     try? await Task.sleep(nanoseconds: UInt64(DeckMetrics.drawerDuration * 1_000_000_000))
                     guard !Task.isCancelled, !self.hoverInside, self.mode == .peek else { return }
                 }
-                self.previewID = nil
-                self.drawerOpen = false
-                self.mode = .dormant
+                self.fanTask?.cancel()
+                withAnimation(Self.drawerAnimation) {
+                    self.previewID = nil
+                    self.fanCount = 0
+                    self.mode = .dormant
+                }
                 self.applyLayout(animated: true)
                 self.syncRoot()
             }
@@ -217,39 +241,9 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func setPreview(_ id: UUID?) {
         guard mode == .peek else { return }
-        if previewID == id {
-            if id != nil, !drawerOpen {
-                drawerTask?.cancel()
-                drawerTask = Task { [weak self] in
-                    await self?.openDrawer(widthChanged: false)
-                }
-            }
-            return
-        }
-        drawerTask?.cancel()
-        drawerTask = Task { [weak self] in
-            await self?.transitionPreview(to: id)
-        }
-    }
-
-    private func transitionPreview(to id: UUID?) async {
-        guard !Task.isCancelled else { return }
-        previewID = id
-        if id == nil {
-            withAnimation(Self.drawerAnimation) {
-                drawerOpen = false
-            }
-            return
-        }
+        guard previewID != id else { return }
         withAnimation(Self.drawerAnimation) {
-            drawerOpen = true
-        }
-    }
-
-    private func openDrawer(widthChanged: Bool) async {
-        guard !Task.isCancelled else { return }
-        withAnimation(Self.drawerAnimation) {
-            drawerOpen = true
+            previewID = id
         }
     }
 
@@ -362,11 +356,11 @@ final class DeckController: NSObject, NSWindowDelegate {
             )
         case .peek:
             let stack = tabStackHeight(count: max(items.count, 1))
-            let extra = DeckMetrics.previewWidth
+            let sheet = DeckMetrics.peekSheetWidth
             let height = stack + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
-            let width = DeckMetrics.tabWidth + extra + pad
+            let width = sheet + pad
             return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - extra,
+                x: vf.maxX - sheet,
                 y: top - stack - DeckMetrics.plusSize - DeckMetrics.plusGap,
                 width: width,
                 height: height
@@ -375,13 +369,14 @@ final class DeckController: NSObject, NSWindowDelegate {
             let stack = tabStackHeight(count: max(items.count, 1))
             let index = items.firstIndex(where: { $0.id == id }) ?? 0
             let noteSize = clampExpandedSize(expandedSize, visible: vf)
+            let sheet = max(noteSize.width, DeckMetrics.peekSheetWidth)
             let noteTopOffset = CGFloat(index) * DeckMetrics.tabStride
             let noteBottomNeeded = noteTopOffset + noteSize.height
             let contentHeight = max(stack + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
-            let width = noteSize.width + DeckMetrics.tabWidth + pad
+            let width = sheet + pad
             let height = contentHeight + pad + DeckMetrics.topGutter
             return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - noteSize.width,
+                x: vf.maxX - sheet,
                 y: top - contentHeight,
                 width: width,
                 height: height
@@ -458,7 +453,7 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func clampExpandedSize(_ size: CGSize, visible vf: NSRect? = nil) -> CGSize {
         let frame = vf ?? assignedScreen()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let maxW = max(DeckMetrics.noteResizeMinWidth, frame.width - DeckMetrics.tabWidth - DeckMetrics.shadowPad - 8)
+        let maxW = max(DeckMetrics.noteResizeMinWidth, frame.width - DeckMetrics.shadowPad - 8)
         let maxH = max(DeckMetrics.noteResizeMinHeight, frame.height - DeckMetrics.topGutter - DeckMetrics.shadowPad)
         return CGSize(
             width: min(max(size.width.rounded(), DeckMetrics.noteResizeMinWidth), maxW),
@@ -485,11 +480,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         guard case .expanded = mode, !isResizing else { return }
         let loc = NSEvent.mouseLocation
         if !panel.frame.contains(loc) {
-            previewID = nil
-            drawerOpen = false
-            mode = hoverInside ? .peek : .dormant
-            applyLayout(animated: true)
-            syncRoot()
+            collapse()
         }
     }
 }
