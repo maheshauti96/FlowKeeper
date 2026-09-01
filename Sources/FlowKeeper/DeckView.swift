@@ -287,7 +287,27 @@ struct ExpandedNote: View {
                 .padding(.vertical, 4)
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                HStack(spacing: 8) {
+                    Button {
+                        AppDelegate.shared.openBoard(editing: item)
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(Color.white)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .stroke(Color.black.opacity(0.28), lineWidth: 1.2)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Edit on board")
+                    .accessibilityLabel("Edit on board")
+
                     TextField("Title", text: store.titleBinding(item.id))
                         .textFieldStyle(.plain)
                         .font(NoteFont.title(22))

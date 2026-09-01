@@ -28,6 +28,10 @@ final class BoardWindowController: NSWindowController, NSWindowDelegate {
         window.contentView = NSHostingView(rootView: root)
     }
 
+    func edit(_ item: FlowItem) {
+        session.beginEdit(item)
+    }
+
     func windowWillClose(_ notification: Notification) {
         onClosed?()
     }

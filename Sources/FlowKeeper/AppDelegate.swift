@@ -69,6 +69,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         board?.window?.makeKeyAndOrderFront(nil)
     }
 
+    func openBoard(editing item: FlowItem?) {
+        openBoard()
+        if let item {
+            board?.edit(item)
+        }
+    }
+
     func openLibrary(filter: LibraryScope = .all) {
         if library == nil {
             library = LibraryWindowController(store: store)

@@ -415,16 +415,16 @@ struct BoardCard: View {
                 session.beginEdit(item)
             } label: {
                 Image(systemName: "square.and.pencil")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.inkMuted)
-                    .frame(width: 22, height: 22)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 26, height: 26)
                     .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Palette.cream)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.white)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Palette.hairline, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(Color.black.opacity(0.28), lineWidth: 1.2)
                     )
             }
             .buttonStyle(.plain)
