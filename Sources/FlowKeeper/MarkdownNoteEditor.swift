@@ -36,6 +36,7 @@ enum MarkdownNoteStyler {
 
     static func apply(to tv: NSTextView, font: NSFont, color: NSColor) {
         guard let storage = tv.textStorage else { return }
+        let color = color.fkResolved(in: tv.effectiveAppearance)
         let selected = tv.selectedRange()
         let ns = storage.string as NSString
         let full = NSRange(location: 0, length: ns.length)
@@ -312,6 +313,11 @@ final class MarkdownNoteTextView: NSTextView {
         super.didChangeText()
         guard !restyling else { return }
         onPlainTextChange?(string)
+        restyle()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
         restyle()
     }
 

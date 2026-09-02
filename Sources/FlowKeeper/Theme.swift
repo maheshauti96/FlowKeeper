@@ -2,13 +2,94 @@ import AppKit
 import CoreGraphics
 import SwiftUI
 
+/// One source of truth for FlowKeeper chrome. Light keeps cream paper + charcoal ink;
+/// dark flips to warm charcoal surfaces + cream ink. Sticky-note swatches stay pastel.
 enum Palette {
-    static let cream = Color(hex: 0xF3F0E8)
-    static let creamDark = Color(hex: 0xE7E2D6)
-    static let ink = Color(hex: 0x1C2430)
-    static let inkMuted = Color(hex: 0x5C6570)
-    static let hairline = Color.black.opacity(0.08)
-    static let boardColumn = Color.white.opacity(0.72)
+    static let cream = Color(nsColor: .fkCream)
+    static let creamDark = Color(nsColor: .fkCreamDark)
+    static let ink = Color(nsColor: .fkInk)
+    static let inkMuted = Color(nsColor: .fkInkMuted)
+    static let hairline = Color(nsColor: .fkHairline)
+    static let boardColumn = Color(nsColor: .fkBoardColumn)
+    static let surface = Color(nsColor: .fkSurface)
+    static let field = Color(nsColor: .fkField)
+    static let chipFill = Color(nsColor: .fkChipFill)
+    static let elevated = Color(nsColor: .fkElevated)
+    static let accent = Color(nsColor: .fkAccent)
+
+    static var nsCream: NSColor { .fkCream }
+    static var nsInk: NSColor { .fkInk }
+    static var nsInkMuted: NSColor { .fkInkMuted }
+    static var nsField: NSColor { .fkField }
+}
+
+extension NSColor {
+    func fkResolved(in appearance: NSAppearance) -> NSColor {
+        var result = self
+        appearance.performAsCurrentDrawingAppearance {
+            result = self.usingColorSpace(.sRGB) ?? self
+        }
+        return result
+    }
+
+    static func fkDynamic(light: UInt32, lightAlpha: CGFloat = 1, dark: UInt32, darkAlpha: CGFloat = 1) -> NSColor {
+        NSColor(name: nil) { appearance in
+            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                return NSColor(hex: dark, alpha: darkAlpha)
+            }
+            return NSColor(hex: light, alpha: lightAlpha)
+        }
+    }
+
+    static let fkCream = fkDynamic(light: 0xF3F0E8, dark: 0x1F1C18)
+    static let fkCreamDark = fkDynamic(light: 0xE7E2D6, dark: 0x2A2621)
+    static let fkInk = fkDynamic(light: 0x1C2430, dark: 0xF3F0E8)
+    static let fkInkMuted = fkDynamic(light: 0x5C6570, dark: 0xA89F93)
+    static let fkHairline = fkDynamic(light: 0x000000, lightAlpha: 0.08, dark: 0xF3F0E8, darkAlpha: 0.12)
+    static let fkBoardColumn = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.72, dark: 0x2C2924, darkAlpha: 0.92)
+    static let fkSurface = fkDynamic(light: 0xFFFFFF, dark: 0x2E2A25)
+    static let fkField = fkDynamic(light: 0xF3F0E8, dark: 0x161410)
+    static let fkChipFill = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.72, dark: 0x3A3530, darkAlpha: 1)
+    static let fkElevated = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.55, dark: 0x35312C, darkAlpha: 0.92)
+    static let fkAccent = fkDynamic(light: 0x2F3A4A, dark: 0xD9D2C6)
+}
+
+extension View {
+    /// Plain fields must set ink + fill; SwiftUI `.primary` is light in Dark Mode.
+    func paletteFieldInk() -> some View {
+        self
+            .foregroundStyle(Palette.ink)
+            .tint(Palette.ink)
+    }
+
+    func paletteFieldChrome(cornerRadius: CGFloat = 10, padding: CGFloat = 10) -> some View {
+        self
+            .paletteFieldInk()
+            .padding(padding)
+            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Palette.field))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Palette.hairline, lineWidth: 1)
+            )
+    }
+
+    func paletteSearchChrome() -> some View {
+        self
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Palette.surface))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Palette.hairline, lineWidth: 1)
+            )
+    }
+
+    /// `borderlessButton` draws an empty light bezel in Dark Mode and hides the label.
+    func paletteMenuChrome() -> some View {
+        self
+            .buttonStyle(.plain)
+            .fixedSize()
+    }
 }
 
 enum DeckMetrics {

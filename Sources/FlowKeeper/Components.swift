@@ -5,6 +5,7 @@ struct NoteBodyView: NSViewRepresentable {
     var text: Binding<String>
     var font: NSFont
     var color: NSColor
+    var background: NSColor = .clear
     var showsScroller: Bool = false
 
     func makeCoordinator() -> Coordinator {
@@ -31,8 +32,7 @@ struct NoteBodyView: NSViewRepresentable {
         tv.font = font
         tv.textColor = color
         tv.insertionPointColor = color
-        tv.backgroundColor = .clear
-        tv.drawsBackground = false
+        applyChrome(tv)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
@@ -60,9 +60,10 @@ struct NoteBodyView: NSViewRepresentable {
         tv.onPlainTextChange = { [weak coord = context.coordinator] value in
             coord?.text.wrappedValue = value
         }
-        tv.insertionPointColor = color
+        applyChrome(tv)
         let fontChanged = tv.styleFont.fontName != font.fontName || tv.styleFont.pointSize != font.pointSize
-        let colorChanged = !tv.styleColor.isEqual(color)
+        let resolved = color.fkResolved(in: tv.effectiveAppearance)
+        let colorChanged = tv.textColor?.isEqual(resolved) != true
         tv.styleFont = font
         tv.styleColor = color
         if tv.string != text.wrappedValue {
@@ -71,6 +72,17 @@ struct NoteBodyView: NSViewRepresentable {
             tv.restyle()
         }
         scroll.hasVerticalScroller = showsScroller
+    }
+
+    private func applyChrome(_ tv: MarkdownNoteTextView) {
+        let bg = background.fkResolved(in: tv.effectiveAppearance)
+        let ink = color.fkResolved(in: tv.effectiveAppearance)
+        let fills = bg.alphaComponent > 0.01
+        tv.backgroundColor = fills ? bg : .clear
+        tv.drawsBackground = fills
+        tv.textColor = ink
+        tv.insertionPointColor = ink
+        tv.styleColor = color
     }
 
     final class Coordinator {
@@ -97,13 +109,14 @@ struct ActorChip: View {
             if !compact {
                 Text(actor?.name ?? "Unassigned")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Palette.ink.opacity(0.75))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, compact ? 0 : 8)
         .padding(.vertical, compact ? 0 : 4)
         .background(
-            Capsule().fill(Color.white.opacity(compact ? 0 : 0.55))
+            Capsule().fill(compact ? Color.clear : Palette.chipFill)
         )
     }
 }
@@ -115,7 +128,7 @@ struct StageChip: View {
         Text(status.chip)
             .font(.system(size: 9, weight: .semibold, design: .rounded))
             .tracking(0.4)
-            .foregroundStyle(Palette.ink.opacity(0.7))
+            .foregroundStyle(Palette.ink)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(
@@ -205,7 +218,7 @@ struct ActorFilterBar: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Palette.inkMuted)
                         .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.white.opacity(0.7)))
+                        .background(Circle().fill(Palette.surface))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Add actor")
@@ -230,7 +243,7 @@ struct FilterPill: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
-                    Capsule().fill(selected ? Color.white : Color.clear)
+                    Capsule().fill(selected ? Palette.surface : Color.clear)
                 )
                 .shadow(color: selected ? .black.opacity(0.06) : .clear, radius: 4, y: 1)
         }
@@ -263,7 +276,7 @@ struct ActorAssignMenu: View {
         } label: {
             ActorChip(actor: store.actor(for: item.actorID))
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 
     private func promptNewActor() {
@@ -336,7 +349,7 @@ struct PriorityAssignMenu: View {
         } label: {
             PriorityChip(priority: item.priority)
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 }
 
@@ -360,7 +373,7 @@ struct StageAssignMenu: View {
         } label: {
             StageChip(status: store.status(for: item.statusID))
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 }
 

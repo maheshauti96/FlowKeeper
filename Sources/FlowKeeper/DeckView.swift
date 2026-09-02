@@ -142,7 +142,7 @@ struct DeckView: View {
             .frame(width: DeckMetrics.plusSize, height: DeckMetrics.plusSize)
             .shadow(color: .black.opacity(0.16), radius: 6, y: 1)
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
         .frame(width: DeckMetrics.plusSize, height: DeckMetrics.plusSize)
     }
 
@@ -383,6 +383,7 @@ struct NoteSheet: View {
                     .textFieldStyle(.plain)
                     .font(NoteFont.title(22))
                     .foregroundStyle(swatch.ink)
+                    .tint(swatch.ink)
                 Button {
                     deck.collapse()
                 } label: {

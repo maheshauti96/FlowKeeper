@@ -16,7 +16,7 @@ final class BoardWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "Board — Flow Keeper"
         window.minSize = NSSize(width: 960, height: 620)
-        window.backgroundColor = NSColor(hex: 0xF3F0E8)
+        window.backgroundColor = Palette.nsCream
         window.setFrameAutosaveName("FlowKeeper.Board")
         window.center()
         self.init(window: window)
@@ -53,7 +53,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "All Flows — Flow Keeper"
         window.minSize = NSSize(width: 820, height: 520)
-        window.backgroundColor = NSColor(hex: 0xF3F0E8)
+        window.backgroundColor = Palette.nsCream
         window.setFrameAutosaveName("FlowKeeper.Library")
         window.center()
         self.init(window: window, holder: holder)

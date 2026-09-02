@@ -51,12 +51,13 @@ struct LibraryView: View {
                     .foregroundStyle(Palette.inkMuted)
                 TextField("Search titles, bodies, tags", text: holder.queryBinding)
                     .textFieldStyle(.plain)
+                    .paletteFieldInk()
                 Text("\(filtered.count)")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Palette.inkMuted)
             }
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Palette.surface))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
@@ -228,6 +229,7 @@ struct LibraryDetail: View {
                     .textFieldStyle(.plain)
                     .font(NoteFont.title(26))
                     .foregroundStyle(swatch.ink)
+                    .tint(swatch.ink)
                 NoteBodyView(
                     text: store.bodyBinding(item.id),
                     font: NSFont(name: "Noteworthy-Light", size: 17) ?? .systemFont(ofSize: 17),

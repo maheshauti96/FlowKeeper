@@ -49,11 +49,10 @@ struct BoardView: View {
                     .foregroundStyle(Palette.inkMuted)
                 TextField("Search flows", text: session.queryBinding)
                     .textFieldStyle(.plain)
+                    .paletteFieldInk()
                     .frame(width: 160)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+            .paletteSearchChrome()
 
             Button {
                 session.beginCreate(statusID: store.defaultStatus().id)
@@ -62,7 +61,7 @@ struct BoardView: View {
                     .font(.system(size: 12, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(hex: 0x2F3A4A))
+            .tint(Palette.accent)
             .accessibilityLabel("New idea")
         }
         .padding(.horizontal, 22)
@@ -184,7 +183,7 @@ struct NowStrip: View {
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(Palette.inkMuted)
                                     .padding(.horizontal, 6)
-                                    .background(Capsule().fill(Color.white))
+                                    .background(Capsule().fill(Palette.surface))
                             }
                             ForEach(group.1) { item in
                                 Button {
@@ -217,7 +216,7 @@ struct NowStrip: View {
                         .frame(maxWidth: 320, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(Color.white.opacity(0.7))
+                                .fill(Palette.elevated)
                         )
                     }
                     Spacer(minLength: 0)
@@ -227,7 +226,7 @@ struct NowStrip: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.55))
+                .fill(Palette.elevated)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -353,7 +352,7 @@ struct BoardColumn: View {
                 .foregroundStyle(Palette.inkMuted)
                 .frame(width: 20, height: 20)
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 
     private func drop(_ ids: [String], before neighbor: UUID?) -> Bool {
@@ -410,7 +409,7 @@ struct BoardCard: View {
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
+                .fill(Palette.surface)
                 .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
         )
         .onTapGesture { session.beginEdit(item) }
