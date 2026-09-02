@@ -345,11 +345,11 @@ final class DeckController: NSObject, NSWindowDelegate {
         case .peek:
             let stack = tabStackHeight(count: max(items.count, 1))
             let sheet = DeckMetrics.peekSheetWidth
-            let height = stack + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
+            let height = stack + DeckMetrics.boardTabGap + DeckMetrics.boardTabHeight + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
             let width = sheet + pad
             return NSRect(
                 x: vf.maxX - sheet,
-                y: top - stack - DeckMetrics.plusSize - DeckMetrics.plusGap,
+                y: top - stack - DeckMetrics.boardTabGap - DeckMetrics.boardTabHeight - DeckMetrics.plusSize - DeckMetrics.plusGap,
                 width: width,
                 height: height
             )
@@ -360,7 +360,7 @@ final class DeckController: NSObject, NSWindowDelegate {
             let sheet = max(noteSize.width, DeckMetrics.peekSheetWidth)
             let noteTopOffset = CGFloat(index) * DeckMetrics.tabStride
             let noteBottomNeeded = noteTopOffset + noteSize.height
-            let contentHeight = max(stack + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
+            let contentHeight = max(stack + DeckMetrics.boardTabGap + DeckMetrics.boardTabHeight + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
             let width = sheet + pad
             let height = contentHeight + pad + DeckMetrics.topGutter
             return NSRect(

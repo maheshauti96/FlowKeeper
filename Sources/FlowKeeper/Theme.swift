@@ -25,6 +25,8 @@ enum DeckMetrics {
     static let noteResizeMinHeight: CGFloat = 180
     static let plusSize: CGFloat = 28
     static let plusGap: CGFloat = 12
+    static let boardTabHeight: CGFloat = 46
+    static let boardTabGap: CGFloat = 8
     static let shadowPad: CGFloat = 22
     static let topGutter: CGFloat = 18
     static let maxVisibleTabs = 8

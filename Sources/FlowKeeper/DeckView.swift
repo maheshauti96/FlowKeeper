@@ -61,8 +61,12 @@ struct DeckView: View {
                     .contextMenu { itemMenu(item) }
             }
 
+            boardTab
+                .padding(.top, DeckMetrics.topGutter + deck.tabStackHeight(count: max(items.count, 1)) + DeckMetrics.boardTabGap)
+                .zIndex(6)
+
             plusButton
-                .padding(.top, DeckMetrics.topGutter + deck.tabStackHeight(count: max(items.count, 1)) + DeckMetrics.plusGap)
+                .padding(.top, DeckMetrics.topGutter + deck.tabStackHeight(count: max(items.count, 1)) + DeckMetrics.boardTabGap + DeckMetrics.boardTabHeight + DeckMetrics.plusGap)
                 .padding(.trailing, 2)
                 .zIndex(5)
         }
@@ -90,6 +94,34 @@ struct DeckView: View {
     private func isSelected(_ item: FlowItem) -> Bool {
         if case .expanded(let id) = deck.mode, id == item.id { return true }
         return deck.previewID == item.id
+    }
+
+
+    private var boardTab: some View {
+        let shape = UnevenRoundedRectangle(
+            cornerRadii: .init(topLeading: 10, bottomLeading: 10, bottomTrailing: 0, topTrailing: 0)
+        )
+        return Button {
+            deck.onOpenBoard?()
+        } label: {
+            Text("BOARD")
+                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .tracking(1.2)
+                .foregroundStyle(Palette.ink.opacity(0.8))
+                .rotationEffect(.degrees(90))
+                .frame(width: DeckMetrics.boardTabHeight - 12, height: DeckMetrics.tabWidth)
+                .frame(width: DeckMetrics.tabWidth, height: DeckMetrics.boardTabHeight)
+                .background(shape.fill(Palette.cream))
+                .overlay(shape.stroke(Palette.hairline, lineWidth: 1))
+                .shadow(color: .black.opacity(0.12), radius: 4, x: -1, y: 1)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() }
+            else { NSCursor.pop() }
+        }
+        .help("Open the board")
+        .accessibilityLabel("Open the board")
     }
 
     private var plusButton: some View {
