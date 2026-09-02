@@ -287,6 +287,60 @@ struct ActorAssignMenu: View {
     }
 }
 
+
+struct PriorityChip: View {
+    var priority: CardPriority
+
+    var body: some View {
+        Text(priority.chip)
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .tracking(0.4)
+            .foregroundStyle(Color(hex: priority.ink))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(Color(hex: priority.wash).opacity(priority == .none ? 0.7 : 0.95))
+            )
+    }
+}
+
+struct PriorityBadge: View {
+    var priority: CardPriority
+
+    var body: some View {
+        if let label = priority.badge {
+            Text(label)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(0.3)
+                .foregroundStyle(Color(hex: priority.ink))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(
+                    Capsule().fill(Color(hex: priority.wash))
+                )
+        }
+    }
+}
+
+struct PriorityAssignMenu: View {
+    var store: FlowStore
+    var item: FlowItem
+
+    var body: some View {
+        Menu {
+            Button("None") { store.setPriority(item.id, to: .none) }
+            Divider()
+            Button("P0") { store.setPriority(item.id, to: .p0) }
+            Button("P1") { store.setPriority(item.id, to: .p1) }
+            Button("P2") { store.setPriority(item.id, to: .p2) }
+        } label: {
+            PriorityChip(priority: item.priority)
+        }
+        .menuStyle(.borderlessButton)
+    }
+}
+
+
 struct StageAssignMenu: View {
     var store: FlowStore
     var item: FlowItem

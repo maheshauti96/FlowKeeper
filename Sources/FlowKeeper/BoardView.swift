@@ -379,11 +379,15 @@ struct BoardCard: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(item.swatch.dash)
                 .frame(height: 4)
-            Text(item.displayTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(item.displayTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                PriorityBadge(priority: item.priority)
+            }
             if !item.preview.isEmpty {
                 Text(item.preview)
                     .font(.system(size: 11))
@@ -422,6 +426,12 @@ struct BoardCard: View {
                 ForEach(store.actors) { actor in
                     Button(actor.name) { store.assign(item.id, to: actor.id) }
                 }
+            }
+            Menu("Priority") {
+                Button("None") { store.setPriority(item.id, to: .none) }
+                Button("P0") { store.setPriority(item.id, to: .p0) }
+                Button("P1") { store.setPriority(item.id, to: .p1) }
+                Button("P2") { store.setPriority(item.id, to: .p2) }
             }
             Button(item.onDeck ? "Remove from deck" : "Pin to deck") {
                 store.pinToDeck(item.id, pin: !item.onDeck)

@@ -344,6 +344,7 @@ struct NoteSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 6) {
                 StageChip(status: store.status(for: item.statusID))
+                PriorityBadge(priority: item.priority)
                 if let actorName = store.actor(for: item.actorID)?.name {
                     Text(actorName)
                         .font(.system(size: 10, weight: .medium))
@@ -403,6 +404,7 @@ struct NoteSheet: View {
             HStack(spacing: 8) {
                 ActorAssignMenu(store: store, item: item)
                 StageAssignMenu(store: store, item: item)
+                PriorityAssignMenu(store: store, item: item)
                 Spacer()
                 Button {
                     store.cycleColor(item.id)

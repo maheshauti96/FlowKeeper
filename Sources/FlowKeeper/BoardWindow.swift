@@ -108,6 +108,7 @@ final class BoardSession {
     var draftStatusID = FlowStatus.ideaID
     var draftActorID: UUID?
     var draftColorID = "sky"
+    var draftPriority: CardPriority = .none
 
     var queryBinding: Binding<String> {
         Binding(get: { self.query }, set: { self.query = $0 })
@@ -137,6 +138,7 @@ final class BoardSession {
         draftStatusID = statusID
         draftActorID = actorID
         draftColorID = StickySwatch.all.randomElement()?.id ?? "sky"
+        draftPriority = .none
     }
 
     func beginEdit(_ item: FlowItem) {
@@ -146,6 +148,7 @@ final class BoardSession {
         draftStatusID = item.statusID
         draftActorID = item.actorID
         draftColorID = item.colorID
+        draftPriority = item.priority
     }
 
     func closeEditor() {

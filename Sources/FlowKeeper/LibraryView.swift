@@ -166,6 +166,7 @@ struct LibraryRow: View {
                         .foregroundStyle(Palette.ink)
                     Spacer()
                     StageChip(status: store.status(for: item.statusID))
+                    PriorityBadge(priority: item.priority)
                     Text(RelativeDate.string(item.updatedAt))
                         .font(.system(size: 11))
                         .foregroundStyle(Palette.inkMuted)

@@ -65,6 +65,17 @@ struct CardDialog: View {
                 }
                 .menuStyle(.borderlessButton)
 
+                Menu {
+                    Button("None") { session.draftPriority = .none }
+                    Divider()
+                    Button("P0") { session.draftPriority = .p0 }
+                    Button("P1") { session.draftPriority = .p1 }
+                    Button("P2") { session.draftPriority = .p2 }
+                } label: {
+                    PriorityChip(priority: session.draftPriority)
+                }
+                .menuStyle(.borderlessButton)
+
                 Spacer()
 
                 HStack(spacing: 6) {
@@ -127,13 +138,15 @@ struct CardDialog: View {
                 onDeck: store.status(for: session.draftStatusID).isSticky,
                 title: session.draftTitle,
                 body: session.draftBody,
-                colorID: session.draftColorID
+                colorID: session.draftColorID,
+                priority: session.draftPriority
             )
         case .edit(let id):
             store.update(id) { item in
                 item.title = session.draftTitle
                 item.body = session.draftBody
                 item.colorID = session.draftColorID
+                item.priority = session.draftPriority
             }
             if store.items.first(where: { $0.id == id })?.statusID != session.draftStatusID {
                 store.move(id, to: session.draftStatusID)
