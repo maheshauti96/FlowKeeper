@@ -35,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         decks.onQuit = { NSApp.terminate(nil) }
         decks.rebuild()
 
+        setupMainMenu()
         setupStatusItem()
         setupHotkeys()
         setupKeyMonitor()
@@ -62,8 +63,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             board?.onClosed = { [weak self] in
                 self?.board = nil
+                self?.updateActivationPolicy()
             }
         }
+        updateActivationPolicy()
         NSApp.activate(ignoringOtherApps: true)
         board?.showWindow(nil)
         board?.window?.makeKeyAndOrderFront(nil)
@@ -84,9 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             library?.onClosed = { [weak self] in
                 self?.library = nil
+                self?.updateActivationPolicy()
             }
         }
         library?.setFilter(filter)
+        updateActivationPolicy()
         NSApp.activate(ignoringOtherApps: true)
         library?.showWindow(nil)
         library?.window?.makeKeyAndOrderFront(nil)
@@ -115,9 +120,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         keys.start()
     }
 
+    private func updateActivationPolicy() {
+        // Accessory hides the menu bar, so Edit → Paste would hit another app.
+        // Promote to regular while a real window is open.
+        if board != nil || library != nil {
+            NSApp.setActivationPolicy(.regular)
+        } else {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+
+    private func setupMainMenu() {
+        let main = NSMenu()
+
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "About Flow Keeper", action: nil, keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Flow Keeper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        main.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(redo)
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = edit
+        main.addItem(editItem)
+
+        NSApp.mainMenu = main
+    }
+
     private func setupKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            if Self.dispatchTextEditingShortcut(event) {
+                return nil
+            }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if flags.contains(.command) && event.charactersIgnoringModifiers == "." {
                 if case .expanded(let id) = self.decks.expanded?.mode {
@@ -192,6 +238,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.saveNow()
         decks.applyFullscreenPreference()
         rebuildMenu()
+    }
+
+    /// Cmd+C/X/V/A/Z only work if an Edit menu exists *or* we send them to the field editor.
+    /// Accessory apps have no default Edit menu, so New flow / note fields otherwise never receive paste.
+    /// Returns true if the event was handled and should be swallowed.
+    private static func dispatchTextEditingShortcut(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        let commandOnly = flags == .command
+        let commandShift = flags == [.command, .shift]
+        guard commandOnly || commandShift else { return false }
+        guard let key = event.charactersIgnoringModifiers?.lowercased() else { return false }
+        guard let responder = NSApp.keyWindow?.firstResponder, Self.isTextEditingResponder(responder) else {
+            return false
+        }
+
+        let selector: Selector
+        if commandOnly {
+            switch key {
+            case "v": selector = #selector(NSText.paste(_:))
+            case "c": selector = #selector(NSText.copy(_:))
+            case "x": selector = #selector(NSText.cut(_:))
+            case "a": selector = #selector(NSText.selectAll(_:))
+            case "z": selector = Selector(("undo:"))
+            default: return false
+            }
+        } else if key == "z" {
+            selector = Selector(("redo:"))
+        } else {
+            return false
+        }
+
+        return NSApp.sendAction(selector, to: nil, from: nil)
+    }
+
+    private static func isTextEditingResponder(_ responder: NSResponder) -> Bool {
+        if responder is NSTextView || responder is NSText || responder is NSTextField {
+            return true
+        }
+        return responder.nextResponder.map(isTextEditingResponder) ?? false
     }
 
     private static func item(_ title: String, key: String, modifiers: NSEvent.ModifierFlags, action: Selector, target: AnyObject) -> NSMenuItem {
