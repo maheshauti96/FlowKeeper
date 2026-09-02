@@ -104,12 +104,9 @@ struct DeckView: View {
         return Button {
             deck.onOpenBoard?()
         } label: {
-            Text("BOARD")
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .tracking(1.2)
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Palette.ink.opacity(0.8))
-                .rotationEffect(.degrees(90))
-                .frame(width: DeckMetrics.boardTabHeight - 12, height: DeckMetrics.tabWidth)
                 .frame(width: DeckMetrics.tabWidth, height: DeckMetrics.boardTabHeight)
                 .background(shape.fill(Palette.cream))
                 .overlay(shape.stroke(Palette.hairline, lineWidth: 1))
