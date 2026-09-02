@@ -35,6 +35,7 @@ final class DeckController: NSObject, NSWindowDelegate {
     private var fanTask: Task<Void, Never>?
     private var outsideMonitor: Any?
     private var localOutsideMonitor: Any?
+    private var ignoreExitUntil: Date?
 
     static var drawerAnimation: Animation {
         .easeInOut(duration: DeckMetrics.drawerDuration)
@@ -161,11 +162,13 @@ final class DeckController: NSObject, NSWindowDelegate {
     func enterPeek(fromTap: Bool = false) {
         guard mode == .dormant else { return }
         fanTask?.cancel()
-        // Reveal every tab at once. Resetting fanCount to 0 then staggering it
-        // made the first hover expand, shrink, then expand again.
+        leaveTask?.cancel()
+        // Swapping the pill for the stack fires a fake mouse-exit. Ignore it
+        // so the first hover does not collapse and reopen.
+        ignoreExitUntil = Date().addingTimeInterval(0.45)
         mode = .peek
         fanCount = store.visibleDeckItems.count
-        applyLayout(animated: true, refreshRoot: false)
+        applyLayout(animated: false, refreshRoot: false)
     }
 
     func openFromClick(_ id: UUID) {
@@ -212,9 +215,11 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func handlePointer(_ point: NSPoint?) {
         guard let point else {
+            if let until = ignoreExitUntil, Date() < until { return }
             handleHover(false)
             return
         }
+        ignoreExitUntil = nil
         handleHover(true)
         guard mode == .peek else { return }
         let yFromTop = hosting.isFlipped ? point.y : (hosting.bounds.height - point.y)

@@ -253,10 +253,8 @@ struct NoteSheet: View {
         .contentShape(paperShape)
         .shadow(color: .black.opacity(showInterior ? 0.22 : 0.12), radius: showInterior ? 12 : 5, x: -2, y: 2)
         .opacity(phase == .hidden ? 0 : 1)
-        .animation(DeckController.drawerAnimation, value: sheetWidth)
-        .animation(DeckController.drawerAnimation, value: sheetHeight)
-        .animation(DeckController.drawerAnimation, value: showInterior)
-        .animation(DeckController.drawerAnimation, value: phase)
+        .animation(DeckController.drawerAnimation, value: deck.previewID)
+        .animation(DeckController.drawerAnimation, value: deck.mode)
         .accessibilityLabel(item.displayTitle)
         .onHover { hovering in
             if hovering { NSCursor.pointingHand.push() }
