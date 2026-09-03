@@ -227,12 +227,12 @@ struct LibraryDetail: View {
             VStack(alignment: .leading, spacing: 10) {
                 TextField("Title", text: store.titleBinding(item.id))
                     .textFieldStyle(.plain)
-                    .font(NoteFont.title(26))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(swatch.ink)
                     .tint(swatch.ink)
                 NoteBodyView(
                     text: store.bodyBinding(item.id),
-                    font: NSFont(name: "Noteworthy-Light", size: 17) ?? .systemFont(ofSize: 17),
+                    font: .systemFont(ofSize: 15),
                     color: swatch.nsInk.withAlphaComponent(0.92),
                     showsScroller: true
                 )

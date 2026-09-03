@@ -337,7 +337,7 @@ struct NoteSheet: View {
     private var peekInterior: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(item.displayTitle)
-                .font(NoteFont.title(18))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(item.swatch.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -381,7 +381,7 @@ struct NoteSheet: View {
 
                 TextField("Title", text: store.titleBinding(item.id))
                     .textFieldStyle(.plain)
-                    .font(NoteFont.title(22))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(swatch.ink)
                     .tint(swatch.ink)
                 Button {
@@ -396,7 +396,7 @@ struct NoteSheet: View {
 
             NoteBodyView(
                 text: store.bodyBinding(item.id),
-                font: NoteFont.nsBody,
+                font: .systemFont(ofSize: 15),
                 color: swatch.nsInk.withAlphaComponent(0.9),
                 showsScroller: true
             )
