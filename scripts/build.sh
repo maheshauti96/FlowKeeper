@@ -41,6 +41,11 @@ if [[ -f "$ICONSRC" ]]; then
   iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns"
 fi
 
+MENUBAR="$ROOT/Resources/MenuBarIcon.png"
+if [[ -f "$MENUBAR" ]]; then
+  cp "$MENUBAR" "$RES/MenuBarIcon.png"
+fi
+
 chmod +x "$MACOS/FlowKeeper"
 echo "Built $APP"
 

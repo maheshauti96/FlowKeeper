@@ -287,15 +287,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func statusImage() -> NSImage {
+        if let url = Bundle.main.url(forResource: "MenuBarIcon", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            image.isTemplate = true
+            image.size = NSSize(width: 18, height: 18)
+            return image
+        }
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
-            let pill = NSBezierPath(roundedRect: NSRect(x: 11, y: 2, width: 5, height: 14), xRadius: 2.5, yRadius: 2.5)
-            NSColor.labelColor.withAlphaComponent(0.9).setFill()
-            pill.fill()
-            let dashes: [CGFloat] = [4.5, 7.5, 10.5, 13.5]
-            NSColor.controlBackgroundColor.setFill()
-            for y in dashes {
-                NSBezierPath(roundedRect: NSRect(x: 12.2, y: y, width: 2.6, height: 1.6), xRadius: 0.8, yRadius: 0.8).fill()
+            NSColor.labelColor.withAlphaComponent(0.92).setFill()
+            let tabs: [(CGFloat, CGFloat)] = [(2.5, 4.4), (7.3, 4.4), (12.1, 4.4)]
+            for (y, h) in tabs {
+                let path = NSBezierPath(roundedRect: NSRect(x: 5.5, y: y, width: 10.5, height: h), xRadius: 2.2, yRadius: 2.2)
+                path.fill()
             }
             return true
         }
