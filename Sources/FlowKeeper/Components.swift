@@ -5,10 +5,11 @@ struct NoteBodyView: NSViewRepresentable {
     var text: Binding<String>
     var font: NSFont
     var color: NSColor
+    var background: NSColor = .clear
     var showsScroller: Bool = false
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: text)
+        Coordinator(text: text, font: font, color: color)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -22,14 +23,16 @@ struct NoteBodyView: NSViewRepresentable {
         scroll.scrollerStyle = .overlay
         scroll.verticalScrollElasticity = .allowed
 
-        let tv = NSTextView()
-        tv.delegate = context.coordinator
-        tv.isRichText = false
+        let tv = MarkdownNoteTextView()
+        tv.isRichText = true
+        tv.importsGraphics = false
+        tv.allowsImageEditing = false
+        tv.styleFont = font
+        tv.styleColor = color
         tv.font = font
         tv.textColor = color
         tv.insertionPointColor = color
-        tv.backgroundColor = .clear
-        tv.drawsBackground = false
+        applyChrome(tv)
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
@@ -38,29 +41,58 @@ struct NoteBodyView: NSViewRepresentable {
         tv.textContainerInset = NSSize(width: 0, height: 2)
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
+        tv.isAutomaticTextReplacementEnabled = false
+        tv.enabledTextCheckingTypes = 0
         tv.string = text.wrappedValue
+        tv.onPlainTextChange = { [weak coord = context.coordinator] value in
+            coord?.text.wrappedValue = value
+        }
+        tv.restyle()
         scroll.documentView = tv
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.text = text
-        guard let tv = scroll.documentView as? NSTextView else { return }
+        context.coordinator.font = font
+        context.coordinator.color = color
+        guard let tv = scroll.documentView as? MarkdownNoteTextView else { return }
+        tv.onPlainTextChange = { [weak coord = context.coordinator] value in
+            coord?.text.wrappedValue = value
+        }
+        applyChrome(tv)
+        let fontChanged = tv.styleFont.fontName != font.fontName || tv.styleFont.pointSize != font.pointSize
+        let resolved = color.fkResolved(in: tv.effectiveAppearance)
+        let colorChanged = tv.textColor?.isEqual(resolved) != true
+        tv.styleFont = font
+        tv.styleColor = color
         if tv.string != text.wrappedValue {
             tv.string = text.wrappedValue
+        } else if fontChanged || colorChanged {
+            tv.restyle()
         }
-        tv.font = font
-        tv.textColor = color
-        tv.insertionPointColor = color
         scroll.hasVerticalScroller = showsScroller
     }
 
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    private func applyChrome(_ tv: MarkdownNoteTextView) {
+        let bg = background.fkResolved(in: tv.effectiveAppearance)
+        let ink = color.fkResolved(in: tv.effectiveAppearance)
+        let fills = bg.alphaComponent > 0.01
+        tv.backgroundColor = fills ? bg : .clear
+        tv.drawsBackground = fills
+        tv.textColor = ink
+        tv.insertionPointColor = ink
+        tv.styleColor = color
+    }
+
+    final class Coordinator {
         var text: Binding<String>
-        init(text: Binding<String>) { self.text = text }
-        func textDidChange(_ notification: Notification) {
-            guard let tv = notification.object as? NSTextView else { return }
-            text.wrappedValue = tv.string
+        var font: NSFont
+        var color: NSColor
+        init(text: Binding<String>, font: NSFont, color: NSColor) {
+            self.text = text
+            self.font = font
+            self.color = color
         }
     }
 }
@@ -76,14 +108,15 @@ struct ActorChip: View {
                 .frame(width: compact ? 8 : 10, height: compact ? 8 : 10)
             if !compact {
                 Text(actor?.name ?? "Unassigned")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Palette.ink.opacity(0.75))
+                    .font(AppFont.ui(11, weight: .medium))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, compact ? 0 : 8)
         .padding(.vertical, compact ? 0 : 4)
         .background(
-            Capsule().fill(Color.white.opacity(compact ? 0 : 0.55))
+            Capsule().fill(compact ? Color.clear : Palette.chipFill)
         )
     }
 }
@@ -93,9 +126,9 @@ struct StageChip: View {
 
     var body: some View {
         Text(status.chip)
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .font(AppFont.ui(9, weight: .semibold))
             .tracking(0.4)
-            .foregroundStyle(Palette.ink.opacity(0.7))
+            .foregroundStyle(Palette.ink)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(
@@ -129,7 +162,7 @@ struct ActorAvatar: View {
         ZStack {
             Circle().fill(actor?.color ?? Color(hex: 0x9AA3AD))
             Text(actor?.initial ?? "?")
-                .font(.system(size: size * 0.45, weight: .bold, design: .rounded))
+                .font(AppFont.ui(size * 0.45, weight: .bold))
                 .foregroundStyle(.white)
         }
         .frame(width: size, height: size)
@@ -141,7 +174,7 @@ struct EmptyColumn: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(AppFont.ui(12))
             .foregroundStyle(Palette.inkMuted.opacity(0.7))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
@@ -185,7 +218,7 @@ struct ActorFilterBar: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Palette.inkMuted)
                         .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.white.opacity(0.7)))
+                        .background(Circle().fill(Palette.surface))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Add actor")
@@ -205,12 +238,12 @@ struct FilterPill: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                .font(AppFont.ui(12, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Palette.ink : Palette.inkMuted)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
-                    Capsule().fill(selected ? Color.white : Color.clear)
+                    Capsule().fill(selected ? Palette.surface : Color.clear)
                 )
                 .shadow(color: selected ? .black.opacity(0.06) : .clear, radius: 4, y: 1)
         }
@@ -243,7 +276,7 @@ struct ActorAssignMenu: View {
         } label: {
             ActorChip(actor: store.actor(for: item.actorID))
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 
     private func promptNewActor() {
@@ -267,6 +300,60 @@ struct ActorAssignMenu: View {
     }
 }
 
+
+struct PriorityChip: View {
+    var priority: CardPriority
+
+    var body: some View {
+        Text(priority.chip)
+            .font(AppFont.ui(9, weight: .semibold))
+            .tracking(0.4)
+            .foregroundStyle(Color(hex: priority.ink))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(
+                Capsule().fill(Color(hex: priority.wash).opacity(priority == .none ? 0.7 : 0.95))
+            )
+    }
+}
+
+struct PriorityBadge: View {
+    var priority: CardPriority
+
+    var body: some View {
+        if let label = priority.badge {
+            Text(label)
+                .font(AppFont.ui(9, weight: .bold))
+                .tracking(0.3)
+                .foregroundStyle(Color(hex: priority.ink))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(
+                    Capsule().fill(Color(hex: priority.wash))
+                )
+        }
+    }
+}
+
+struct PriorityAssignMenu: View {
+    var store: FlowStore
+    var item: FlowItem
+
+    var body: some View {
+        Menu {
+            Button("None") { store.setPriority(item.id, to: .none) }
+            Divider()
+            Button("P0") { store.setPriority(item.id, to: .p0) }
+            Button("P1") { store.setPriority(item.id, to: .p1) }
+            Button("P2") { store.setPriority(item.id, to: .p2) }
+        } label: {
+            PriorityChip(priority: item.priority)
+        }
+        .paletteMenuChrome()
+    }
+}
+
+
 struct StageAssignMenu: View {
     var store: FlowStore
     var item: FlowItem
@@ -286,7 +373,7 @@ struct StageAssignMenu: View {
         } label: {
             StageChip(status: store.status(for: item.statusID))
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 }
 

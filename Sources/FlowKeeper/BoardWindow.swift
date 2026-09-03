@@ -16,7 +16,7 @@ final class BoardWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "Board — Flow Keeper"
         window.minSize = NSSize(width: 960, height: 620)
-        window.backgroundColor = NSColor(hex: 0xF3F0E8)
+        window.backgroundColor = Palette.nsCream
         window.setFrameAutosaveName("FlowKeeper.Board")
         window.center()
         self.init(window: window)
@@ -26,6 +26,10 @@ final class BoardWindowController: NSWindowController, NSWindowDelegate {
             self?.onReveal?(id)
         })
         window.contentView = NSHostingView(rootView: root)
+    }
+
+    func edit(_ item: FlowItem) {
+        session.beginEdit(item)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -49,7 +53,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "All Flows — Flow Keeper"
         window.minSize = NSSize(width: 820, height: 520)
-        window.backgroundColor = NSColor(hex: 0xF3F0E8)
+        window.backgroundColor = Palette.nsCream
         window.setFrameAutosaveName("FlowKeeper.Library")
         window.center()
         self.init(window: window, holder: holder)
@@ -104,6 +108,7 @@ final class BoardSession {
     var draftStatusID = FlowStatus.ideaID
     var draftActorID: UUID?
     var draftColorID = "sky"
+    var draftPriority: CardPriority = .none
 
     var queryBinding: Binding<String> {
         Binding(get: { self.query }, set: { self.query = $0 })
@@ -133,6 +138,7 @@ final class BoardSession {
         draftStatusID = statusID
         draftActorID = actorID
         draftColorID = StickySwatch.all.randomElement()?.id ?? "sky"
+        draftPriority = .none
     }
 
     func beginEdit(_ item: FlowItem) {
@@ -142,6 +148,7 @@ final class BoardSession {
         draftStatusID = item.statusID
         draftActorID = item.actorID
         draftColorID = item.colorID
+        draftPriority = item.priority
     }
 
     func closeEditor() {

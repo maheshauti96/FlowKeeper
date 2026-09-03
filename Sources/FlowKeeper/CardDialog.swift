@@ -9,7 +9,7 @@ struct CardDialog: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(session.isEditing ? "Edit flow" : "New flow")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(AppFont.ui(16, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Button {
@@ -24,19 +24,26 @@ struct CardDialog: View {
 
             TextField("Title", text: session.draftTitleBinding)
                 .textFieldStyle(.plain)
-                .font(.system(size: 20, weight: .semibold))
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Palette.cream))
+                .font(AppFont.ui(20, weight: .semibold))
+                .paletteFieldChrome()
 
             NoteBodyView(
                 text: session.draftBodyBinding,
-                font: .systemFont(ofSize: 14),
-                color: NSColor(hex: 0x1C2430),
+                font: AppFont.ns(14),
+                color: Palette.nsInk,
+                background: Palette.nsField,
                 showsScroller: true
             )
             .frame(height: 160)
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Palette.cream))
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Palette.field)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Palette.hairline, lineWidth: 1)
+            )
 
             HStack(spacing: 10) {
                 Menu {
@@ -54,7 +61,7 @@ struct CardDialog: View {
                 } label: {
                     ActorChip(actor: store.actor(for: session.draftActorID))
                 }
-                .menuStyle(.borderlessButton)
+                .paletteMenuChrome()
 
                 Menu {
                     ForEach(store.orderedStatuses) { status in
@@ -63,7 +70,18 @@ struct CardDialog: View {
                 } label: {
                     StageChip(status: store.status(for: session.draftStatusID))
                 }
-                .menuStyle(.borderlessButton)
+                .paletteMenuChrome()
+
+                Menu {
+                    Button("None") { session.draftPriority = .none }
+                    Divider()
+                    Button("P0") { session.draftPriority = .p0 }
+                    Button("P1") { session.draftPriority = .p1 }
+                    Button("P2") { session.draftPriority = .p2 }
+                } label: {
+                    PriorityChip(priority: session.draftPriority)
+                }
+                .paletteMenuChrome()
 
                 Spacer()
 
@@ -106,14 +124,14 @@ struct CardDialog: View {
                 Button(session.isEditing ? "Save" : "Add") { save() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .tint(Color(hex: 0x2F3A4A))
+                    .tint(Palette.accent)
             }
         }
         .padding(20)
         .frame(width: 520)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
+                .fill(Palette.surface)
                 .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
         )
     }
@@ -127,13 +145,15 @@ struct CardDialog: View {
                 onDeck: store.status(for: session.draftStatusID).isSticky,
                 title: session.draftTitle,
                 body: session.draftBody,
-                colorID: session.draftColorID
+                colorID: session.draftColorID,
+                priority: session.draftPriority
             )
         case .edit(let id):
             store.update(id) { item in
                 item.title = session.draftTitle
                 item.body = session.draftBody
                 item.colorID = session.draftColorID
+                item.priority = session.draftPriority
             }
             if store.items.first(where: { $0.id == id })?.statusID != session.draftStatusID {
                 store.move(id, to: session.draftStatusID)

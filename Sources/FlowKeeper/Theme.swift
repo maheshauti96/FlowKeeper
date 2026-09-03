@@ -2,13 +2,94 @@ import AppKit
 import CoreGraphics
 import SwiftUI
 
+/// One source of truth for FlowKeeper chrome. Light keeps cream paper + charcoal ink;
+/// dark flips to warm charcoal surfaces + cream ink. Sticky-note swatches stay pastel.
 enum Palette {
-    static let cream = Color(hex: 0xF3F0E8)
-    static let creamDark = Color(hex: 0xE7E2D6)
-    static let ink = Color(hex: 0x1C2430)
-    static let inkMuted = Color(hex: 0x5C6570)
-    static let hairline = Color.black.opacity(0.08)
-    static let boardColumn = Color.white.opacity(0.72)
+    static let cream = Color(nsColor: .fkCream)
+    static let creamDark = Color(nsColor: .fkCreamDark)
+    static let ink = Color(nsColor: .fkInk)
+    static let inkMuted = Color(nsColor: .fkInkMuted)
+    static let hairline = Color(nsColor: .fkHairline)
+    static let boardColumn = Color(nsColor: .fkBoardColumn)
+    static let surface = Color(nsColor: .fkSurface)
+    static let field = Color(nsColor: .fkField)
+    static let chipFill = Color(nsColor: .fkChipFill)
+    static let elevated = Color(nsColor: .fkElevated)
+    static let accent = Color(nsColor: .fkAccent)
+
+    static var nsCream: NSColor { .fkCream }
+    static var nsInk: NSColor { .fkInk }
+    static var nsInkMuted: NSColor { .fkInkMuted }
+    static var nsField: NSColor { .fkField }
+}
+
+extension NSColor {
+    func fkResolved(in appearance: NSAppearance) -> NSColor {
+        var result = self
+        appearance.performAsCurrentDrawingAppearance {
+            result = self.usingColorSpace(.sRGB) ?? self
+        }
+        return result
+    }
+
+    static func fkDynamic(light: UInt32, lightAlpha: CGFloat = 1, dark: UInt32, darkAlpha: CGFloat = 1) -> NSColor {
+        NSColor(name: nil) { appearance in
+            if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
+                return NSColor(hex: dark, alpha: darkAlpha)
+            }
+            return NSColor(hex: light, alpha: lightAlpha)
+        }
+    }
+
+    static let fkCream = fkDynamic(light: 0xF3F0E8, dark: 0x1F1C18)
+    static let fkCreamDark = fkDynamic(light: 0xE7E2D6, dark: 0x2A2621)
+    static let fkInk = fkDynamic(light: 0x1C2430, dark: 0xF3F0E8)
+    static let fkInkMuted = fkDynamic(light: 0x5C6570, dark: 0xA89F93)
+    static let fkHairline = fkDynamic(light: 0x000000, lightAlpha: 0.08, dark: 0xF3F0E8, darkAlpha: 0.12)
+    static let fkBoardColumn = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.72, dark: 0x2C2924, darkAlpha: 0.92)
+    static let fkSurface = fkDynamic(light: 0xFFFFFF, dark: 0x2E2A25)
+    static let fkField = fkDynamic(light: 0xF3F0E8, dark: 0x161410)
+    static let fkChipFill = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.72, dark: 0x3A3530, darkAlpha: 1)
+    static let fkElevated = fkDynamic(light: 0xFFFFFF, lightAlpha: 0.55, dark: 0x35312C, darkAlpha: 0.92)
+    static let fkAccent = fkDynamic(light: 0x2F3A4A, dark: 0xD9D2C6)
+}
+
+extension View {
+    /// Plain fields must set ink + fill; SwiftUI `.primary` is light in Dark Mode.
+    func paletteFieldInk() -> some View {
+        self
+            .foregroundStyle(Palette.ink)
+            .tint(Palette.ink)
+    }
+
+    func paletteFieldChrome(cornerRadius: CGFloat = 10, padding: CGFloat = 10) -> some View {
+        self
+            .paletteFieldInk()
+            .padding(padding)
+            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Palette.field))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Palette.hairline, lineWidth: 1)
+            )
+    }
+
+    func paletteSearchChrome() -> some View {
+        self
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Palette.surface))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Palette.hairline, lineWidth: 1)
+            )
+    }
+
+    /// `borderlessButton` draws an empty light bezel in Dark Mode and hides the label.
+    func paletteMenuChrome() -> some View {
+        self
+            .buttonStyle(.plain)
+            .fixedSize()
+    }
 }
 
 enum DeckMetrics {
@@ -17,13 +98,20 @@ enum DeckMetrics {
     static let tabHeight: CGFloat = 98
     static let tabStride: CGFloat = 82
     static let previewWidth: CGFloat = 248
+    static var peekSheetWidth: CGFloat { tabWidth + previewWidth }
+    static let fanStagger: TimeInterval = 0.045
     static let noteWidth: CGFloat = 304
     static let noteMinHeight: CGFloat = 228
+    static let noteResizeMinWidth: CGFloat = 240
+    static let noteResizeMinHeight: CGFloat = 180
     static let plusSize: CGFloat = 28
     static let plusGap: CGFloat = 12
+    static let boardTabHeight: CGFloat = 46
+    static let boardTabGap: CGFloat = 8
     static let shadowPad: CGFloat = 22
     static let topGutter: CGFloat = 18
     static let maxVisibleTabs = 8
+    static let drawerDuration: TimeInterval = 0.32
 }
 
 struct StickySwatch: Identifiable, Hashable {
@@ -59,29 +147,50 @@ struct StickySwatch: Identifiable, Hashable {
     }
 }
 
-enum NoteFont {
-    static func title(_ size: CGFloat) -> Font {
-        if NSFont(name: "Noteworthy-Bold", size: size) != nil {
-            return .custom("Noteworthy-Bold", size: size)
+enum AppFont {
+    static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        let name = postScriptName(for: nsWeight(weight))
+        if NSFont(name: name, size: size) != nil {
+            return .custom(name, size: size)
         }
-        return .system(size: size, weight: .bold, design: .rounded)
+        return .system(size: size, weight: weight, design: .rounded)
     }
 
-    static func body(_ size: CGFloat) -> Font {
-        if NSFont(name: "Noteworthy-Light", size: size) != nil {
-            return .custom("Noteworthy-Light", size: size)
+    static func ns(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let name = postScriptName(for: weight)
+        if let font = NSFont(name: name, size: size) {
+            return font
         }
-        return .system(size: size, weight: .regular, design: .rounded)
+        let base = NSFont.systemFont(ofSize: size, weight: weight)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
+        return NSFont(descriptor: descriptor, size: size) ?? base
     }
 
-    static var nsTitle: NSFont {
-        NSFont(name: "Noteworthy-Bold", size: 20) ?? .systemFont(ofSize: 20, weight: .bold)
+    static func nsWeight(_ weight: Font.Weight) -> NSFont.Weight {
+        switch weight {
+        case .ultraLight: return .ultraLight
+        case .thin: return .thin
+        case .light: return .light
+        case .regular: return .regular
+        case .medium: return .medium
+        case .semibold: return .semibold
+        case .bold: return .bold
+        case .heavy: return .heavy
+        case .black: return .black
+        default: return .regular
+        }
     }
 
-    static var nsBody: NSFont {
-        NSFont(name: "Noteworthy-Light", size: 16) ?? .systemFont(ofSize: 16)
+    /// Noteworthy ships two faces: Light for body, Bold for titles and emphasis.
+    private static func postScriptName(for weight: NSFont.Weight) -> String {
+        if weight >= .medium {
+            return "Noteworthy-Bold"
+        }
+        return "Noteworthy-Light"
     }
 }
+
+
 
 extension Color {
     init(hex: UInt32, alpha: Double = 1) {

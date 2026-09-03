@@ -16,6 +16,13 @@ final class DeckController: NSObject, NSWindowDelegate {
     var mode: DeckMode = .dormant
     var hoverInside = false
     var previewID: UUID?
+    var fanCount = 0
+    var expandedSize = CGSize(width: DeckMetrics.noteWidth, height: DeckMetrics.noteMinHeight)
+    var isResizing = false
+    var resizeOrigin: CGSize?
+
+    private static let expandedWidthKey = "FlowKeeper.expandedNoteWidth"
+    private static let expandedHeightKey = "FlowKeeper.expandedNoteHeight"
 
     var onOpenBoard: (() -> Void)?
     var onOpenLibrary: ((LibraryScope) -> Void)?
@@ -25,8 +32,14 @@ final class DeckController: NSObject, NSWindowDelegate {
     private var panel: DeckPanel!
     private var hosting: DeckHostingView!
     private var leaveTask: Task<Void, Never>?
+    private var fanTask: Task<Void, Never>?
     private var outsideMonitor: Any?
     private var localOutsideMonitor: Any?
+    private var ignoreExitUntil: Date?
+
+    static var drawerAnimation: Animation {
+        .easeInOut(duration: DeckMetrics.drawerDuration)
+    }
 
     var isExpanded: Bool {
         if case .expanded = mode { return true }
@@ -37,6 +50,7 @@ final class DeckController: NSObject, NSWindowDelegate {
         self.store = store
         self.displayID = displayID
         super.init()
+        expandedSize = Self.loadExpandedSize()
         let panel = DeckPanel(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -59,6 +73,8 @@ final class DeckController: NSObject, NSWindowDelegate {
         let hosting = DeckHostingView(rootView: root)
         hosting.wantsLayer = true
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
+        hosting.layer?.masksToBounds = true
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
         panel.contentView = hosting
 
         self.panel = panel
@@ -81,6 +97,7 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func close() {
         leaveTask?.cancel()
+        fanTask?.cancel()
         if let outsideMonitor {
             NSEvent.removeMonitor(outsideMonitor)
         }
@@ -95,7 +112,9 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func forceDormant() {
         leaveTask?.cancel()
+        fanTask?.cancel()
         previewID = nil
+        fanCount = 0
         hoverInside = false
         guard mode != .dormant else { return }
         mode = .dormant
@@ -104,10 +123,15 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     func expand(_ id: UUID) {
-        previewID = nil
+        fanTask?.cancel()
+        leaveTask?.cancel()
         onWillExpand?(displayID)
         store.pinToDeck(id, pin: true)
-        mode = .expanded(id)
+        withAnimation(Self.drawerAnimation) {
+            previewID = id
+            fanCount = store.visibleDeckItems.count
+            mode = .expanded(id)
+        }
         applyLayout(animated: true)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -115,14 +139,39 @@ final class DeckController: NSObject, NSWindowDelegate {
     }
 
     func collapse() {
-        previewID = nil
-        mode = hoverInside ? .peek : .dormant
-        applyLayout(animated: true)
-        syncRoot()
+        fanTask?.cancel()
+        leaveTask?.cancel()
+        if hoverInside {
+            withAnimation(Self.drawerAnimation) {
+                mode = .peek
+                fanCount = store.visibleDeckItems.count
+            }
+            applyLayout(animated: true)
+            syncRoot()
+        } else {
+            withAnimation(Self.drawerAnimation) {
+                previewID = nil
+                fanCount = 0
+                mode = .dormant
+            }
+            applyLayout(animated: true)
+            syncRoot()
+        }
+    }
+
+    func enterPeek(fromTap: Bool = false) {
+        guard mode == .dormant else { return }
+        fanTask?.cancel()
+        leaveTask?.cancel()
+        // Swapping the pill for the stack fires a fake mouse-exit. Ignore it
+        // so the first hover does not collapse and reopen.
+        ignoreExitUntil = Date().addingTimeInterval(0.45)
+        mode = .peek
+        fanCount = store.visibleDeckItems.count
+        applyLayout(animated: false, refreshRoot: false)
     }
 
     func openFromClick(_ id: UUID) {
-        previewID = nil
         toggleExpand(id)
     }
 
@@ -139,16 +188,25 @@ final class DeckController: NSObject, NSWindowDelegate {
         leaveTask?.cancel()
         if inside {
             if mode == .dormant {
-                mode = .peek
-                applyLayout(animated: true)
-                syncRoot()
+                enterPeek()
             }
         } else if mode == .peek {
             leaveTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: 220_000_000)
                 guard let self, !self.hoverInside, self.mode == .peek else { return }
-                self.previewID = nil
-                self.mode = .dormant
+                if self.previewID != nil {
+                    withAnimation(Self.drawerAnimation) {
+                        self.previewID = nil
+                    }
+                    try? await Task.sleep(nanoseconds: UInt64(DeckMetrics.drawerDuration * 1_000_000_000))
+                    guard !Task.isCancelled, !self.hoverInside, self.mode == .peek else { return }
+                }
+                self.fanTask?.cancel()
+                withAnimation(Self.drawerAnimation) {
+                    self.previewID = nil
+                    self.fanCount = 0
+                    self.mode = .dormant
+                }
                 self.applyLayout(animated: true)
                 self.syncRoot()
             }
@@ -157,9 +215,11 @@ final class DeckController: NSObject, NSWindowDelegate {
 
     func handlePointer(_ point: NSPoint?) {
         guard let point else {
+            if let until = ignoreExitUntil, Date() < until { return }
             handleHover(false)
             return
         }
+        ignoreExitUntil = nil
         handleHover(true)
         guard mode == .peek else { return }
         let yFromTop = hosting.isFlipped ? point.y : (hosting.bounds.height - point.y)
@@ -171,10 +231,8 @@ final class DeckController: NSObject, NSWindowDelegate {
     func setPreview(_ id: UUID?) {
         guard mode == .peek else { return }
         guard previewID != id else { return }
-        let widthChanged = (previewID == nil) != (id == nil)
-        previewID = id
-        if widthChanged {
-            applyLayout(animated: true, refreshRoot: false)
+        withAnimation(Self.drawerAnimation) {
+            previewID = id
         }
     }
 
@@ -235,21 +293,36 @@ final class DeckController: NSObject, NSWindowDelegate {
         if refreshRoot {
             syncRoot()
         }
-        hosting.frame = NSRect(origin: .zero, size: frame.size)
+        pinHosting(to: frame.size)
         if animated {
             NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.16
+                ctx.duration = DeckMetrics.drawerDuration
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
             }, completionHandler: { [weak self] in
                 Task { @MainActor in
-                    self?.syncPreviewToMouse()
+                    guard let self else { return }
+                    self.pinHosting(to: frame.size)
                 }
             })
         } else {
             panel.setFrame(frame, display: true)
+            pinHosting(to: frame.size)
             syncPreviewToMouse()
         }
+    }
+
+    /// Keep SwiftUI content glued to the panel's trailing/top edges so a grow-left
+    /// (or grow-down) animation reveals the drawer instead of clipping tabs.
+    private func pinHosting(to size: NSSize) {
+        let bounds = panel.contentView?.bounds ?? hosting.superview?.bounds ?? .zero
+        hosting.autoresizingMask = [.minXMargin, .minYMargin]
+        hosting.frame = NSRect(
+            x: bounds.maxX - size.width,
+            y: bounds.maxY - size.height,
+            width: size.width,
+            height: size.height
+        )
     }
 
     func targetFrame(on screen: NSScreen) -> NSRect {
@@ -271,25 +344,27 @@ final class DeckController: NSObject, NSWindowDelegate {
             )
         case .peek:
             let stack = tabStackHeight(count: max(items.count, 1))
-            let extra = previewID == nil ? 0 : DeckMetrics.previewWidth
-            let height = stack + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
-            let width = DeckMetrics.tabWidth + extra + pad
+            let sheet = DeckMetrics.peekSheetWidth
+            let height = stack + DeckMetrics.boardTabGap + DeckMetrics.boardTabHeight + DeckMetrics.plusSize + DeckMetrics.plusGap + pad + DeckMetrics.topGutter
+            let width = sheet + pad
             return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - extra,
-                y: top - stack - DeckMetrics.plusSize - DeckMetrics.plusGap,
+                x: vf.maxX - sheet,
+                y: top - stack - DeckMetrics.boardTabGap - DeckMetrics.boardTabHeight - DeckMetrics.plusSize - DeckMetrics.plusGap,
                 width: width,
                 height: height
             )
         case .expanded(let id):
             let stack = tabStackHeight(count: max(items.count, 1))
             let index = items.firstIndex(where: { $0.id == id }) ?? 0
+            let noteSize = clampExpandedSize(expandedSize, visible: vf)
+            let sheet = max(noteSize.width, DeckMetrics.peekSheetWidth)
             let noteTopOffset = CGFloat(index) * DeckMetrics.tabStride
-            let noteBottomNeeded = noteTopOffset + DeckMetrics.noteMinHeight
-            let contentHeight = max(stack + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
-            let width = DeckMetrics.noteWidth + DeckMetrics.tabWidth + pad
+            let noteBottomNeeded = noteTopOffset + noteSize.height
+            let contentHeight = max(stack + DeckMetrics.boardTabGap + DeckMetrics.boardTabHeight + DeckMetrics.plusSize + DeckMetrics.plusGap, noteBottomNeeded)
+            let width = sheet + pad
             let height = contentHeight + pad + DeckMetrics.topGutter
             return NSRect(
-                x: vf.maxX - DeckMetrics.tabWidth - DeckMetrics.noteWidth,
+                x: vf.maxX - sheet,
                 y: top - contentHeight,
                 width: width,
                 height: height
@@ -342,13 +417,58 @@ final class DeckController: NSObject, NSWindowDelegate {
         }
     }
 
+    func setExpandedSize(_ size: CGSize) {
+        isResizing = true
+        let vf = assignedScreen()?.visibleFrame
+        let clamped = clampExpandedSize(size, visible: vf)
+        expandedSize = clamped
+        applyLayout(animated: false, refreshRoot: false)
+    }
+
+    func beginExpandedResize() {
+        if resizeOrigin == nil {
+            resizeOrigin = expandedSize
+        }
+        isResizing = true
+    }
+
+    func endExpandedResize() {
+        persistExpandedSize()
+        resizeOrigin = nil
+        isResizing = false
+        applyLayout(animated: false, refreshRoot: false)
+    }
+
+    func clampExpandedSize(_ size: CGSize, visible vf: NSRect? = nil) -> CGSize {
+        let frame = vf ?? assignedScreen()?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let maxW = max(DeckMetrics.noteResizeMinWidth, frame.width - DeckMetrics.shadowPad - 8)
+        let maxH = max(DeckMetrics.noteResizeMinHeight, frame.height - DeckMetrics.topGutter - DeckMetrics.shadowPad)
+        return CGSize(
+            width: min(max(size.width.rounded(), DeckMetrics.noteResizeMinWidth), maxW),
+            height: min(max(size.height.rounded(), DeckMetrics.noteResizeMinHeight), maxH)
+        )
+    }
+
+    private static func loadExpandedSize() -> CGSize {
+        let defaults = UserDefaults.standard
+        let width = defaults.object(forKey: expandedWidthKey) as? Double
+        let height = defaults.object(forKey: expandedHeightKey) as? Double
+        return CGSize(
+            width: width ?? DeckMetrics.noteWidth,
+            height: height ?? DeckMetrics.noteMinHeight
+        )
+    }
+
+    private func persistExpandedSize() {
+        UserDefaults.standard.set(Double(expandedSize.width), forKey: Self.expandedWidthKey)
+        UserDefaults.standard.set(Double(expandedSize.height), forKey: Self.expandedHeightKey)
+    }
+
     private func collapseIfClickOutside() {
-        guard case .expanded = mode else { return }
+        guard case .expanded = mode, !isResizing else { return }
         let loc = NSEvent.mouseLocation
         if !panel.frame.contains(loc) {
-            mode = hoverInside ? .peek : .dormant
-            applyLayout(animated: true)
-            syncRoot()
+            collapse()
         }
     }
 }

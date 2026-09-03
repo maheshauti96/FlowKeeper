@@ -39,7 +39,7 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("All Flows")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(AppFont.ui(20, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Button("Export…") { exportSelected() }
@@ -51,12 +51,13 @@ struct LibraryView: View {
                     .foregroundStyle(Palette.inkMuted)
                 TextField("Search titles, bodies, tags", text: holder.queryBinding)
                     .textFieldStyle(.plain)
+                    .paletteFieldInk()
                 Text("\(filtered.count)")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(AppFont.ui(11, weight: .medium))
                     .foregroundStyle(Palette.inkMuted)
             }
             .padding(8)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Palette.surface))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
@@ -82,10 +83,10 @@ struct LibraryView: View {
                 VStack(spacing: 8) {
                     Spacer()
                     Text("Nothing in this view")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(AppFont.ui(13, weight: .medium))
                         .foregroundStyle(Palette.inkMuted)
                     Text("Capture with ⌥⌘N, or loosen the filters.")
-                        .font(.system(size: 12))
+                        .font(AppFont.ui(12))
                         .foregroundStyle(Palette.inkMuted)
                     Spacer()
                 }
@@ -120,10 +121,10 @@ struct LibraryView: View {
         } else {
             VStack(spacing: 8) {
                 Text("Select a flow")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(AppFont.ui(15, weight: .medium))
                     .foregroundStyle(Palette.inkMuted)
                 Text("Every idea you capture lives here, even after it leaves the deck.")
-                    .font(.system(size: 12))
+                    .font(AppFont.ui(12))
                     .foregroundStyle(Palette.inkMuted)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -162,17 +163,18 @@ struct LibraryRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(item.displayTitle)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppFont.ui(13, weight: .semibold))
                         .foregroundStyle(Palette.ink)
                     Spacer()
                     StageChip(status: store.status(for: item.statusID))
+                    PriorityBadge(priority: item.priority)
                     Text(RelativeDate.string(item.updatedAt))
-                        .font(.system(size: 11))
+                        .font(AppFont.ui(11))
                         .foregroundStyle(Palette.inkMuted)
                         .frame(width: 36, alignment: .trailing)
                 }
                 Text(item.preview.isEmpty ? " " : item.preview)
-                    .font(.system(size: 12))
+                    .font(AppFont.ui(12))
                     .foregroundStyle(Palette.inkMuted)
                     .lineLimit(1)
                 HStack(spacing: 8) {
@@ -181,7 +183,7 @@ struct LibraryRow: View {
                     }
                     if item.onDeck {
                         Text("ON DECK")
-                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .font(AppFont.ui(9, weight: .semibold))
                             .foregroundStyle(Palette.inkMuted)
                     }
                 }
@@ -203,7 +205,7 @@ struct LibraryDetail: View {
                 HStack(spacing: 8) {
                     Circle().fill(swatch.dash).frame(width: 8, height: 8)
                     Text(item.onDeck ? "ON DECK" : store.status(for: item.statusID).chip)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(AppFont.ui(11, weight: .semibold))
                         .tracking(0.6)
                         .foregroundStyle(Palette.inkMuted)
                 }
@@ -225,18 +227,19 @@ struct LibraryDetail: View {
             VStack(alignment: .leading, spacing: 10) {
                 TextField("Title", text: store.titleBinding(item.id))
                     .textFieldStyle(.plain)
-                    .font(NoteFont.title(26))
+                    .font(AppFont.ui(22, weight: .semibold))
                     .foregroundStyle(swatch.ink)
+                    .tint(swatch.ink)
                 NoteBodyView(
                     text: store.bodyBinding(item.id),
-                    font: NSFont(name: "Noteworthy-Light", size: 17) ?? .systemFont(ofSize: 17),
+                    font: AppFont.ns(15),
                     color: swatch.nsInk.withAlphaComponent(0.92),
                     showsScroller: true
                 )
                 .frame(minHeight: 180)
                 HStack {
                     Text("Created \(RelativeDate.string(item.createdAt)) · Updated \(RelativeDate.string(item.updatedAt))")
-                        .font(.system(size: 11))
+                        .font(AppFont.ui(11))
                         .foregroundStyle(swatch.ink.opacity(0.5))
                     Spacer()
                 }

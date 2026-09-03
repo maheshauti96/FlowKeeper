@@ -35,10 +35,10 @@ struct BoardView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Board")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(AppFont.ui(22, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Text("What’s in your head, what’s planned, and who’s holding it.")
-                    .font(.system(size: 12))
+                    .font(AppFont.ui(12))
                     .foregroundStyle(Palette.inkMuted)
             }
             Spacer()
@@ -49,20 +49,19 @@ struct BoardView: View {
                     .foregroundStyle(Palette.inkMuted)
                 TextField("Search flows", text: session.queryBinding)
                     .textFieldStyle(.plain)
+                    .paletteFieldInk()
                     .frame(width: 160)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white))
+            .paletteSearchChrome()
 
             Button {
                 session.beginCreate(statusID: store.defaultStatus().id)
             } label: {
                 Label("New idea", systemImage: "plus")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AppFont.ui(12, weight: .semibold))
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(hex: 0x2F3A4A))
+            .tint(Palette.accent)
             .accessibilityLabel("New idea")
         }
         .padding(.horizontal, 22)
@@ -102,10 +101,10 @@ struct AddStatusColumn: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Statuses")
-                .font(.system(size: 13, weight: .semibold))
+                .font(AppFont.ui(13, weight: .semibold))
                 .foregroundStyle(Palette.ink)
             Text("Add a column for a new kind of work.")
-                .font(.system(size: 10))
+                .font(AppFont.ui(10))
                 .foregroundStyle(Palette.inkMuted)
             Button {
                 if let name = TextPrompt.ask(
@@ -117,7 +116,7 @@ struct AddStatusColumn: View {
                 }
             } label: {
                 Label("Add status", systemImage: "plus")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppFont.ui(12, weight: .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
@@ -158,15 +157,15 @@ struct NowStrip: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("NOW")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(AppFont.ui(11, weight: .bold))
                     .tracking(1.4)
                     .foregroundStyle(Palette.inkMuted)
                 Text("Work in flight, by who is holding it")
-                    .font(.system(size: 11))
+                    .font(AppFont.ui(11))
                     .foregroundStyle(Palette.inkMuted.opacity(0.8))
                 Spacer()
                 Text(items.isEmpty ? "Nothing ongoing" : "\(items.count) in flight")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.ui(11, weight: .medium))
                     .foregroundStyle(Palette.inkMuted)
             }
 
@@ -179,12 +178,12 @@ struct NowStrip: View {
                             HStack(spacing: 8) {
                                 ActorAvatar(actor: group.0, size: 20)
                                 Text(group.0?.name ?? "Unassigned")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(AppFont.ui(12, weight: .semibold))
                                 Text("\(group.1.count)")
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(AppFont.ui(10, weight: .bold))
                                     .foregroundStyle(Palette.inkMuted)
                                     .padding(.horizontal, 6)
-                                    .background(Capsule().fill(Color.white))
+                                    .background(Capsule().fill(Palette.surface))
                             }
                             ForEach(group.1) { item in
                                 Button {
@@ -195,7 +194,7 @@ struct NowStrip: View {
                                             .fill(item.swatch.dash)
                                             .frame(width: 4, height: 22)
                                         Text(item.displayTitle)
-                                            .font(.system(size: 12, weight: .medium))
+                                            .font(AppFont.ui(12, weight: .medium))
                                             .foregroundStyle(Palette.ink)
                                             .lineLimit(1)
                                         Spacer()
@@ -217,7 +216,7 @@ struct NowStrip: View {
                         .frame(maxWidth: 320, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(Color.white.opacity(0.7))
+                                .fill(Palette.elevated)
                         )
                     }
                     Spacer(minLength: 0)
@@ -227,7 +226,7 @@ struct NowStrip: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.55))
+                .fill(Palette.elevated)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -250,7 +249,7 @@ struct BoardColumn: View {
             HStack(spacing: 8) {
                 Circle().fill(status.tint).frame(width: 8, height: 8)
                 Text(status.name)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(AppFont.ui(13, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 if status.isSticky {
@@ -260,12 +259,12 @@ struct BoardColumn: View {
                         .help("This status sits on the edge deck")
                 }
                 Text("\(items.count)")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(AppFont.ui(11, weight: .semibold))
                     .foregroundStyle(Palette.inkMuted)
                 statusMenu
             }
             Text(status.detail.isEmpty ? " " : status.detail)
-                .font(.system(size: 10))
+                .font(AppFont.ui(10))
                 .foregroundStyle(Palette.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -299,7 +298,7 @@ struct BoardColumn: View {
                 session.beginCreate(statusID: status.id)
             } label: {
                 Label("Add", systemImage: "plus")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.ui(11, weight: .medium))
                     .foregroundStyle(Palette.inkMuted)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -353,7 +352,7 @@ struct BoardColumn: View {
                 .foregroundStyle(Palette.inkMuted)
                 .frame(width: 20, height: 20)
         }
-        .menuStyle(.borderlessButton)
+        .paletteMenuChrome()
     }
 
     private func drop(_ ids: [String], before neighbor: UUID?) -> Bool {
@@ -379,14 +378,18 @@ struct BoardCard: View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(item.swatch.dash)
                 .frame(height: 4)
-            Text(item.displayTitle)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(item.displayTitle)
+                    .font(AppFont.ui(13, weight: .semibold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                PriorityBadge(priority: item.priority)
+            }
             if !item.preview.isEmpty {
                 Text(item.preview)
-                    .font(.system(size: 11))
+                    .font(AppFont.ui(11))
                     .foregroundStyle(Palette.inkMuted)
                     .lineLimit(2)
             }
@@ -399,14 +402,14 @@ struct BoardCard: View {
                         .foregroundStyle(Palette.inkMuted)
                 }
                 Text(RelativeDate.string(item.updatedAt))
-                    .font(.system(size: 10))
+                    .font(AppFont.ui(10))
                     .foregroundStyle(Palette.inkMuted)
             }
         }
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
+                .fill(Palette.surface)
                 .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
         )
         .onTapGesture { session.beginEdit(item) }
@@ -422,6 +425,12 @@ struct BoardCard: View {
                 ForEach(store.actors) { actor in
                     Button(actor.name) { store.assign(item.id, to: actor.id) }
                 }
+            }
+            Menu("Priority") {
+                Button("None") { store.setPriority(item.id, to: .none) }
+                Button("P0") { store.setPriority(item.id, to: .p0) }
+                Button("P1") { store.setPriority(item.id, to: .p1) }
+                Button("P2") { store.setPriority(item.id, to: .p2) }
             }
             Button(item.onDeck ? "Remove from deck" : "Pin to deck") {
                 store.pinToDeck(item.id, pin: !item.onDeck)

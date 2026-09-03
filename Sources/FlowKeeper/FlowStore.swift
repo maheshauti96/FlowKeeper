@@ -118,7 +118,8 @@ final class FlowStore {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if q.isEmpty { return true }
         let actorName = actor(for: item.actorID)?.name.lowercased() ?? ""
-        let hay = ([item.title, item.body, status(for: item.statusID).name, actorName] + item.tags)
+        let priorityLabel = item.priority.badge?.lowercased() ?? ""
+        let hay = ([item.title, item.body, status(for: item.statusID).name, actorName, priorityLabel] + item.tags)
             .joined(separator: " ")
             .lowercased()
         return hay.contains(q)
@@ -131,7 +132,8 @@ final class FlowStore {
         onDeck: Bool = true,
         title: String = "",
         body: String = "",
-        colorID: String? = nil
+        colorID: String? = nil,
+        priority: CardPriority = .none
     ) -> FlowItem {
         let used = Set(items.map(\.colorID))
         let color = colorID ?? StickySwatch.all.first { !used.contains($0.id) }?.id ?? StickySwatch.all[items.count % StickySwatch.all.count].id
@@ -152,6 +154,7 @@ final class FlowStore {
             colorID: color,
             statusID: resolvedStatus,
             actorID: actorID,
+            priority: priority,
             tags: [],
             onDeck: onDeck && status(for: resolvedStatus).isSticky,
             createdAt: now,
@@ -184,6 +187,10 @@ final class FlowStore {
 
     func assign(_ id: UUID, to actorID: UUID?) {
         update(id) { $0.actorID = actorID }
+    }
+
+    func setPriority(_ id: UUID, to priority: CardPriority) {
+        update(id) { $0.priority = priority }
     }
 
     func pinToDeck(_ id: UUID, pin: Bool) {
@@ -251,6 +258,9 @@ final class FlowStore {
             var md = "# \(item.displayTitle)\n\n"
             md += "- Status: \(status(for: item.statusID).name)\n"
             md += "- Actor: \(actor)\n"
+            if let p = item.priority.badge {
+                md += "- Priority: \(p)\n"
+            }
             if !item.tags.isEmpty {
                 md += "- Tags: \(item.tags.joined(separator: ", "))\n"
             }

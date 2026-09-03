@@ -100,6 +100,56 @@ struct FlowStatus: Identifiable, Codable, Hashable {
     }
 }
 
+
+enum CardPriority: String, Codable, CaseIterable, Hashable {
+    case none
+    case p0
+    case p1
+    case p2
+
+    var badge: String? {
+        switch self {
+        case .none: return nil
+        case .p0: return "P0"
+        case .p1: return "P1"
+        case .p2: return "P2"
+        }
+    }
+
+    var menuTitle: String {
+        switch self {
+        case .none: return "None"
+        case .p0: return "P0"
+        case .p1: return "P1"
+        case .p2: return "P2"
+        }
+    }
+
+    var chip: String {
+        badge ?? "NONE"
+    }
+
+    /// Pastel inks: P0 a bit more urgent, P2 quieter.
+    var ink: UInt32 {
+        switch self {
+        case .none: return 0x8A9098
+        case .p0: return 0xC45C6A
+        case .p1: return 0xC48A4A
+        case .p2: return 0x7A8894
+        }
+    }
+
+    var wash: UInt32 {
+        switch self {
+        case .none: return 0xE4E6E8
+        case .p0: return 0xF5C9D0
+        case .p1: return 0xF6E0C4
+        case .p2: return 0xD8DEE4
+        }
+    }
+}
+
+
 enum ActorKind: String, Codable {
     case me
     case agent
@@ -137,6 +187,7 @@ struct FlowItem: Identifiable, Hashable {
     var colorID: String
     var statusID: UUID
     var actorID: UUID?
+    var priority: CardPriority = .none
     var tags: [String]
     var onDeck: Bool
     var createdAt: Date
@@ -168,7 +219,7 @@ struct FlowItem: Identifiable, Hashable {
 
 extension FlowItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, title, body, colorID, statusID, stage, actorID, tags, onDeck, createdAt, updatedAt, rank
+        case id, title, body, colorID, statusID, stage, actorID, priority, tags, onDeck, createdAt, updatedAt, rank
     }
 
     init(from decoder: Decoder) throws {
@@ -185,6 +236,7 @@ extension FlowItem: Codable {
             statusID = FlowStatus.ideaID
         }
         actorID = try c.decodeIfPresent(UUID.self, forKey: .actorID)
+        priority = try c.decodeIfPresent(CardPriority.self, forKey: .priority) ?? .none
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         onDeck = try c.decode(Bool.self, forKey: .onDeck)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
@@ -200,6 +252,7 @@ extension FlowItem: Codable {
         try c.encode(colorID, forKey: .colorID)
         try c.encode(statusID, forKey: .statusID)
         try c.encodeIfPresent(actorID, forKey: .actorID)
+        try c.encode(priority, forKey: .priority)
         try c.encode(tags, forKey: .tags)
         try c.encode(onDeck, forKey: .onDeck)
         try c.encode(createdAt, forKey: .createdAt)
