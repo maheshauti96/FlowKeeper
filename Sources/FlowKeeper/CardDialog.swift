@@ -134,6 +134,7 @@ struct CardDialog: View {
                 .fill(Palette.surface)
                 .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
         )
+        .fontDesign(.rounded)
     }
 
     private func save() {

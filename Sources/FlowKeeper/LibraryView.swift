@@ -28,6 +28,7 @@ struct LibraryView: View {
                 .frame(minWidth: 420)
         }
         .background(Palette.cream)
+        .fontDesign(.rounded)
         .onAppear {
             if holder.selectedID == nil {
                 holder.selectedID = filtered.first?.id

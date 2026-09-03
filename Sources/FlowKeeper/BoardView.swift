@@ -29,6 +29,7 @@ struct BoardView: View {
                 }
             }
         }
+        .fontDesign(.rounded)
     }
 
     private var header: some View {
