@@ -16,7 +16,7 @@ struct CardDialog: View {
                     session.closeEditor()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(AppFont.ui(11, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Palette.inkMuted)
                 }
                 .buttonStyle(.plain)
@@ -134,7 +134,6 @@ struct CardDialog: View {
                 .fill(Palette.surface)
                 .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
         )
-        .fontDesign(.rounded)
     }
 
     private func save() {

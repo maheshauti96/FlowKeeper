@@ -149,10 +149,18 @@ struct StickySwatch: Identifiable, Hashable {
 
 enum AppFont {
     static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        Font(ns(size, weight: nsWeight(weight)))
+        let name = postScriptName(for: nsWeight(weight))
+        if NSFont(name: name, size: size) != nil {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: weight, design: .rounded)
     }
 
     static func ns(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let name = postScriptName(for: weight)
+        if let font = NSFont(name: name, size: size) {
+            return font
+        }
         let base = NSFont.systemFont(ofSize: size, weight: weight)
         guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
         return NSFont(descriptor: descriptor, size: size) ?? base
@@ -172,7 +180,16 @@ enum AppFont {
         default: return .regular
         }
     }
+
+    /// Noteworthy ships two faces: Light for body, Bold for titles and emphasis.
+    private static func postScriptName(for weight: NSFont.Weight) -> String {
+        if weight >= .medium {
+            return "Noteworthy-Bold"
+        }
+        return "Noteworthy-Light"
+    }
 }
+
 
 
 extension Color {

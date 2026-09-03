@@ -279,10 +279,6 @@ enum MarkdownNoteStyler {
     private static func headingFont(from base: NSFont, level: Int) -> NSFont {
         let scale: CGFloat = level == 1 ? 1.48 : level == 2 ? 1.26 : 1.12
         let size = (base.pointSize * scale).rounded()
-        let bolded = NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
-        if let descriptor = bolded.fontDescriptor.withDesign(.rounded) {
-            return NSFont(descriptor: descriptor, size: size) ?? AppFont.ns(size, weight: .bold)
-        }
         return AppFont.ns(size, weight: .bold)
     }
 

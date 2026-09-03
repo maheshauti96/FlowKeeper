@@ -29,7 +29,6 @@ struct BoardView: View {
                 }
             }
         }
-        .fontDesign(.rounded)
     }
 
     private var header: some View {
@@ -200,7 +199,7 @@ struct NowStrip: View {
                                             .lineLimit(1)
                                         Spacer()
                                         Image(systemName: "square.and.pencil")
-                                            .font(AppFont.ui(9, weight: .bold))
+                                            .font(.system(size: 9, weight: .bold))
                                             .foregroundStyle(Palette.inkMuted)
                                     }
                                     .padding(.horizontal, 10)
@@ -255,7 +254,7 @@ struct BoardColumn: View {
                 Spacer()
                 if status.isSticky {
                     Image(systemName: "rectangle.trailinghalf.inset.filled")
-                        .font(AppFont.ui(10))
+                        .font(.system(size: 10))
                         .foregroundStyle(status.tint)
                         .help("This status sits on the edge deck")
                 }
@@ -349,7 +348,7 @@ struct BoardColumn: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(AppFont.ui(11, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Palette.inkMuted)
                 .frame(width: 20, height: 20)
         }
@@ -399,7 +398,7 @@ struct BoardCard: View {
                 Spacer()
                 if item.onDeck {
                     Image(systemName: "rectangle.trailinghalf.inset.filled")
-                        .font(AppFont.ui(10))
+                        .font(.system(size: 10))
                         .foregroundStyle(Palette.inkMuted)
                 }
                 Text(RelativeDate.string(item.updatedAt))

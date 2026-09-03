@@ -25,7 +25,7 @@ final class BoardWindowController: NSWindowController, NSWindowDelegate {
         let root = BoardView(store: store, session: session, onReveal: { [weak self] id in
             self?.onReveal?(id)
         })
-        window.contentView = NSHostingView(rootView: root.fontDesign(.rounded))
+        window.contentView = NSHostingView(rootView: root)
     }
 
     func edit(_ item: FlowItem) {
@@ -65,7 +65,7 @@ final class LibraryWindowController: NSWindowController, NSWindowDelegate {
                 self?.onReveal?(id)
             }
         )
-        window.contentView = NSHostingView(rootView: root.fontDesign(.rounded))
+        window.contentView = NSHostingView(rootView: root)
     }
 
     private init(window: NSWindow, holder: LibraryFilterHolder) {

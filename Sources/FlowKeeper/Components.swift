@@ -162,7 +162,7 @@ struct ActorAvatar: View {
         ZStack {
             Circle().fill(actor?.color ?? Color(hex: 0x9AA3AD))
             Text(actor?.initial ?? "?")
-                .font(.system(size: size * 0.45, weight: .bold, design: .rounded))
+                .font(AppFont.ui(size * 0.45, weight: .bold))
                 .foregroundStyle(.white)
         }
         .frame(width: size, height: size)
@@ -174,7 +174,7 @@ struct EmptyColumn: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(AppFont.ui(12))
             .foregroundStyle(Palette.inkMuted.opacity(0.7))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)

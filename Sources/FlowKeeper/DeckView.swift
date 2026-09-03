@@ -74,7 +74,7 @@ struct DeckView: View {
         .overlay(alignment: .topTrailing) {
             if store.hiddenDeckCount > 0 {
                 Text("+\(store.hiddenDeckCount)")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(AppFont.ui(9, weight: .bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -149,9 +149,9 @@ struct DeckView: View {
     private func undoBanner(_ undo: UndoPayload) -> some View {
         HStack(spacing: 10) {
             Text("Deleted “\(undo.item.displayTitle)”")
-                .font(.system(size: 11))
+                .font(AppFont.ui(11))
             Button("Undo") { store.undoDelete() }
-                .font(.system(size: 11, weight: .semibold))
+                .font(AppFont.ui(11, weight: .semibold))
                 .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)
@@ -323,7 +323,7 @@ struct NoteSheet: View {
     private var tabStrip: some View {
         ZStack {
             Text(item.tabLabel)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(AppFont.ui(9, weight: .bold))
                 .tracking(1.1)
                 .foregroundStyle(item.swatch.ink.opacity(0.82))
                 .lineLimit(1)
@@ -337,7 +337,7 @@ struct NoteSheet: View {
     private var peekInterior: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(item.displayTitle)
-                .font(.system(size: 15, weight: .semibold))
+                .font(AppFont.ui(15, weight: .semibold))
                 .foregroundStyle(item.swatch.ink)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -347,7 +347,7 @@ struct NoteSheet: View {
                 PriorityBadge(priority: item.priority)
                 if let actorName = store.actor(for: item.actorID)?.name {
                     Text(actorName)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(AppFont.ui(10, weight: .medium))
                         .foregroundStyle(item.swatch.ink.opacity(0.55))
                 }
             }
@@ -381,7 +381,7 @@ struct NoteSheet: View {
 
                 TextField("Title", text: store.titleBinding(item.id))
                     .textFieldStyle(.plain)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(AppFont.ui(20, weight: .semibold))
                     .foregroundStyle(swatch.ink)
                     .tint(swatch.ink)
                 Button {
