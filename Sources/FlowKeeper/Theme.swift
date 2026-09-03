@@ -147,29 +147,18 @@ struct StickySwatch: Identifiable, Hashable {
     }
 }
 
-enum NoteFont {
-    static func title(_ size: CGFloat) -> Font {
-        if NSFont(name: "Noteworthy-Bold", size: size) != nil {
-            return .custom("Noteworthy-Bold", size: size)
-        }
-        return .system(size: size, weight: .bold, design: .rounded)
+enum AppFont {
+    static func ui(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
     }
 
-    static func body(_ size: CGFloat) -> Font {
-        if NSFont(name: "Noteworthy-Light", size: size) != nil {
-            return .custom("Noteworthy-Light", size: size)
-        }
-        return .system(size: size, weight: .regular, design: .rounded)
-    }
-
-    static var nsTitle: NSFont {
-        NSFont(name: "Noteworthy-Bold", size: 20) ?? .systemFont(ofSize: 20, weight: .bold)
-    }
-
-    static var nsBody: NSFont {
-        NSFont(name: "Noteworthy-Light", size: 16) ?? .systemFont(ofSize: 16)
+    static func ns(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size, weight: weight)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
+        return NSFont(descriptor: descriptor, size: size) ?? base
     }
 }
+
 
 extension Color {
     init(hex: UInt32, alpha: Double = 1) {

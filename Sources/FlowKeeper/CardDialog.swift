@@ -9,14 +9,14 @@ struct CardDialog: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(session.isEditing ? "Edit flow" : "New flow")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(AppFont.ui(16, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Button {
                     session.closeEditor()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(AppFont.ui(11, weight: .bold))
                         .foregroundStyle(Palette.inkMuted)
                 }
                 .buttonStyle(.plain)
@@ -24,12 +24,12 @@ struct CardDialog: View {
 
             TextField("Title", text: session.draftTitleBinding)
                 .textFieldStyle(.plain)
-                .font(.system(size: 20, weight: .semibold))
+                .font(AppFont.ui(20, weight: .semibold))
                 .paletteFieldChrome()
 
             NoteBodyView(
                 text: session.draftBodyBinding,
-                font: .systemFont(ofSize: 14),
+                font: AppFont.ns(14),
                 color: Palette.nsInk,
                 background: Palette.nsField,
                 showsScroller: true

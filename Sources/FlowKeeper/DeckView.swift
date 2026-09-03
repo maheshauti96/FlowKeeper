@@ -396,7 +396,7 @@ struct NoteSheet: View {
 
             NoteBodyView(
                 text: store.bodyBinding(item.id),
-                font: .systemFont(ofSize: 15),
+                font: AppFont.ns(15),
                 color: swatch.nsInk.withAlphaComponent(0.9),
                 showsScroller: true
             )

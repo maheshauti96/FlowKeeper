@@ -108,7 +108,7 @@ struct ActorChip: View {
                 .frame(width: compact ? 8 : 10, height: compact ? 8 : 10)
             if !compact {
                 Text(actor?.name ?? "Unassigned")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(AppFont.ui(11, weight: .medium))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
             }
@@ -126,7 +126,7 @@ struct StageChip: View {
 
     var body: some View {
         Text(status.chip)
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .font(AppFont.ui(9, weight: .semibold))
             .tracking(0.4)
             .foregroundStyle(Palette.ink)
             .padding(.horizontal, 7)
@@ -238,7 +238,7 @@ struct FilterPill: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                .font(AppFont.ui(12, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Palette.ink : Palette.inkMuted)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
@@ -306,7 +306,7 @@ struct PriorityChip: View {
 
     var body: some View {
         Text(priority.chip)
-            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .font(AppFont.ui(9, weight: .semibold))
             .tracking(0.4)
             .foregroundStyle(Color(hex: priority.ink))
             .padding(.horizontal, 7)
@@ -323,7 +323,7 @@ struct PriorityBadge: View {
     var body: some View {
         if let label = priority.badge {
             Text(label)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(AppFont.ui(9, weight: .bold))
                 .tracking(0.3)
                 .foregroundStyle(Color(hex: priority.ink))
                 .padding(.horizontal, 5)

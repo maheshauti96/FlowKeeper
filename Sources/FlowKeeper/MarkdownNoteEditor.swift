@@ -279,22 +279,17 @@ enum MarkdownNoteStyler {
     private static func headingFont(from base: NSFont, level: Int) -> NSFont {
         let scale: CGFloat = level == 1 ? 1.48 : level == 2 ? 1.26 : 1.12
         let size = (base.pointSize * scale).rounded()
-        if base.fontName.lowercased().contains("noteworthy") {
-            return NSFont(name: "Noteworthy-Bold", size: size)
-                ?? NSFont.systemFont(ofSize: size, weight: .bold)
-        }
         let bolded = NSFontManager.shared.convert(base, toHaveTrait: .boldFontMask)
-        return NSFont(descriptor: bolded.fontDescriptor, size: size) ?? .systemFont(ofSize: size, weight: .bold)
+        if let descriptor = bolded.fontDescriptor.withDesign(.rounded) {
+            return NSFont(descriptor: descriptor, size: size) ?? AppFont.ns(size, weight: .bold)
+        }
+        return AppFont.ns(size, weight: .bold)
     }
 
     private static func emphasized(_ base: NSFont, bold: Bool, italic: Bool) -> NSFont {
         var font = base
         if bold {
-            if base.fontName.lowercased().contains("noteworthy") {
-                font = NSFont(name: "Noteworthy-Bold", size: base.pointSize) ?? font
-            } else {
-                font = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
-            }
+            font = NSFontManager.shared.convert(font, toHaveTrait: .boldFontMask)
         }
         if italic {
             font = NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
@@ -305,7 +300,7 @@ enum MarkdownNoteStyler {
 
 final class MarkdownNoteTextView: NSTextView {
     var onPlainTextChange: ((String) -> Void)?
-    var styleFont: NSFont = .systemFont(ofSize: 16)
+    var styleFont: NSFont = AppFont.ns(16)
     var styleColor: NSColor = .textColor
     private var restyling = false
 

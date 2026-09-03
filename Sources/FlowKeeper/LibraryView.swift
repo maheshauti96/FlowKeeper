@@ -39,7 +39,7 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("All Flows")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(AppFont.ui(20, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
                 Button("Export…") { exportSelected() }
@@ -163,7 +163,7 @@ struct LibraryRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
                     Text(item.displayTitle)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(AppFont.ui(13, weight: .semibold))
                         .foregroundStyle(Palette.ink)
                     Spacer()
                     StageChip(status: store.status(for: item.statusID))
@@ -232,7 +232,7 @@ struct LibraryDetail: View {
                     .tint(swatch.ink)
                 NoteBodyView(
                     text: store.bodyBinding(item.id),
-                    font: .systemFont(ofSize: 15),
+                    font: AppFont.ns(15),
                     color: swatch.nsInk.withAlphaComponent(0.92),
                     showsScroller: true
                 )
